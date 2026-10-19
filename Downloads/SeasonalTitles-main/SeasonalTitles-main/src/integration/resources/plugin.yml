@@ -1,0 +1,12 @@
+name: SeasonalTitlesRenderingFixture
+version: '1'
+main: dev.seasonal.titles.RenderingFixture
+api-version: '1.21.11'
+depend: [SeasonalTitles]
+commands:
+  stfixture:
+    description: Disposable rendering regression fixture; never deploy to production
+    permission: seasonaltitles.fixture
+permissions:
+  seasonaltitles.fixture:
+    default: op

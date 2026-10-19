@@ -1,0 +1,200 @@
+package dev.seasonal.titles;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class OwnerVisibilityTest {
+  SeasonalTitlesPlugin plugin;
+  Settings settings;
+  TitleRenderer renderer;
+  Player owner, viewer;
+  World world;
+  Scoreboard scoreboard;
+
+  @BeforeEach
+  void setup() {
+    plugin = mock(SeasonalTitlesPlugin.class);
+    settings = mock(Settings.class);
+    when(plugin.getName()).thenReturn("SeasonalTitles");
+    when(plugin.namespace()).thenReturn("seasonaltitles");
+    when(plugin.settings()).thenReturn(settings);
+    when(settings.showSelf()).thenReturn(true);
+    when(settings.lineOfSight()).thenReturn(true);
+    when(settings.distance()).thenReturn(32.0);
+    renderer = new TitleRenderer(plugin);
+    owner = mock(Player.class);
+    viewer = mock(Player.class);
+    when(owner.getUniqueId()).thenReturn(UUID.randomUUID());
+    when(viewer.getUniqueId()).thenReturn(UUID.randomUUID());
+    when(owner.getName()).thenReturn("Owner");
+    when(viewer.getName()).thenReturn("Viewer");
+    world = mock(World.class);
+    scoreboard = mock(Scoreboard.class);
+    for (Player p : new Player[] {owner, viewer}) {
+      when(p.getWorld()).thenReturn(world);
+      when(p.getLocation()).thenAnswer(i -> new Location(world, 0, 80, 0));
+      when(p.getScoreboard()).thenReturn(scoreboard);
+      when(p.canSee(owner)).thenReturn(true);
+    }
+    when(owner.isVisibleByDefault()).thenReturn(true);
+  }
+
+  @Test
+  void normalEquippedTitleIsVisibleToItsOwnerWithoutAPreview() {
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    // Asking the server to ray trace a player's eyes to their own body is not an F5 camera test.
+    verify(owner, never()).hasLineOfSight(any(org.bukkit.entity.Entity.class));
+    verify(owner, never()).getEyeLocation();
+  }
+
+  @Test
+  void optOutOnlySuppressesNormalSelfViewNotPreviewOrOtherViewers() {
+    when(settings.showSelf()).thenReturn(false);
+    assertEquals("self-disabled", renderer.visibilityReason(owner, owner, false));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, true));
+    when(settings.lineOfSight()).thenReturn(false);
+    assertEquals("visible", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void selfPreviewAndEquipKeepConcealmentGates() {
+    when(plugin.titleHidden(owner.getUniqueId())).thenReturn(true);
+    for (boolean preview : new boolean[] {false, true})
+      assertEquals("hidden-by-integration", renderer.visibilityReason(owner, owner, preview));
+    when(plugin.titleHidden(owner.getUniqueId())).thenReturn(false);
+    when(owner.canSee(owner)).thenReturn(false);
+    assertEquals("player-hidden", renderer.visibilityReason(owner, owner, false));
+    when(owner.canSee(owner)).thenReturn(true);
+    when(owner.isVisibleByDefault()).thenReturn(false);
+    assertEquals("player-hidden", renderer.visibilityReason(owner, owner, true));
+  }
+
+  @Test
+  void customNametagTeamDoesNotBlockOwnerIncludingOperatorSelfView() {
+    Team team = mock(Team.class);
+    when(scoreboard.getEntryTeam("Owner")).thenReturn(team);
+    when(team.getOption(Team.Option.NAME_TAG_VISIBILITY)).thenReturn(Team.OptionStatus.NEVER);
+    when(owner.isOp()).thenReturn(true);
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, true));
+    // Even explicit observer enforcement must not disable the owner's F5 title.
+    when(settings.respectTeamNameVisibility()).thenReturn(true);
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    verify(team, never()).setOption(any(), any());
+  }
+
+  private Team customNametagTeam() {
+    Team team = mock(Team.class);
+    when(team.getName()).thenReturn("custom_labels");
+    when(scoreboard.getEntryTeam("Owner")).thenReturn(team);
+    when(team.getOption(Team.Option.NAME_TAG_VISIBILITY)).thenReturn(Team.OptionStatus.NEVER);
+    return team;
+  }
+
+  @Test
+  void teamRulesAreInformationalForObserversByDefault() {
+    Team team = customNametagTeam();
+    when(viewer.hasLineOfSight(owner)).thenReturn(true);
+    when(viewer.getEyeLocation()).thenReturn(new Location(world, 0, 81.6, 3));
+    when(owner.getHeight()).thenReturn(1.8);
+    for (Team.OptionStatus rule : Team.OptionStatus.values()) {
+      when(team.getOption(Team.Option.NAME_TAG_VISIBILITY)).thenReturn(rule);
+      assertEquals("visible", renderer.visibilityReason(viewer, owner, false));
+    }
+    verify(team, never()).setOption(any(), any());
+  }
+
+  @Test
+  void strictTeamEnforcementRequiresOptInAndOnlyAppliesToObservers() {
+    customNametagTeam();
+    when(settings.respectTeamNameVisibility()).thenReturn(true);
+    assertEquals("scoreboard-observer-rule", renderer.visibilityReason(viewer, owner, false));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    // Operator observer status never overrides explicit concealment policies.
+    when(viewer.isOp()).thenReturn(true);
+    when(viewer.canSee(owner)).thenReturn(false);
+    assertEquals("player-hidden", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void ignoredScoreboardDoesNotOverrideStealthOrLineOfSight() {
+    customNametagTeam();
+    when(viewer.hasLineOfSight(owner)).thenReturn(false);
+    assertEquals("body-occluded", renderer.visibilityReason(viewer, owner, false));
+    when(viewer.canSee(owner)).thenReturn(false);
+    assertEquals("player-hidden", renderer.visibilityReason(viewer, owner, false));
+    when(viewer.canSee(owner)).thenReturn(true);
+    when(plugin.titleHidden(owner.getUniqueId())).thenReturn(true);
+    assertEquals("hidden-by-integration", renderer.visibilityReason(owner, owner, false));
+    assertEquals("hidden-by-integration", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void titleHeightOcclusionRemainsEnforcedWithCustomNametags() {
+    customNametagTeam();
+    when(viewer.hasLineOfSight(owner)).thenReturn(true);
+    when(viewer.getEyeLocation()).thenReturn(new Location(world, 0, 81.6, 3));
+    when(owner.getHeight()).thenReturn(1.8);
+    when(world.rayTraceBlocks(
+            any(Location.class),
+            any(org.bukkit.util.Vector.class),
+            anyDouble(),
+            eq(org.bukkit.FluidCollisionMode.NEVER),
+            eq(true)))
+        .thenReturn(new org.bukkit.util.RayTraceResult(new org.bukkit.util.Vector(0, 82, 1)));
+    assertEquals("title-occluded", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void diagnosticsReportVanillaLabelRestrictionSeparatelyFromTitlePolicy() {
+    customNametagTeam();
+    String report = renderer.scoreboardDiagnostics(owner, owner);
+    assertTrue(report.contains("team=custom_labels"));
+    assertTrue(report.contains("name-tag-rule=NEVER"));
+    assertTrue(report.contains("vanilla-name-visible=false"));
+    assertTrue(report.contains("mode=informational"));
+    assertTrue(report.contains("applied=false"));
+    assertTrue(report.contains("writer/intent=unknown"));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    when(settings.respectTeamNameVisibility()).thenReturn(true);
+    assertTrue(renderer.scoreboardDiagnostics(viewer, owner).contains("applied=true"));
+    assertTrue(renderer.scoreboardDiagnostics(owner, owner).contains("applied=false"));
+  }
+
+  @Test
+  void observerDoesNotGetSelfLineOfSightExemption() {
+    when(viewer.hasLineOfSight(owner)).thenReturn(false);
+    assertEquals("body-occluded", renderer.visibilityReason(viewer, owner, false));
+    when(viewer.getWorld()).thenReturn(mock(World.class));
+    assertEquals("different-world", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void existingConfigWithoutNewKeyEnablesSelfView() throws Exception {
+    try (var reader =
+        new InputStreamReader(
+            getClass().getResourceAsStream("/config.yml"), StandardCharsets.UTF_8)) {
+      YamlConfiguration config = YamlConfiguration.loadConfiguration(reader);
+      config.set("visibility.show-self", null);
+      config.set("visibility.respect-team-nametag-visibility", null);
+      assertTrue(Settings.read(config).showSelf());
+      assertFalse(Settings.read(config).respectTeamNameVisibility());
+      config.set("visibility.respect-team-nametag-visibility", true);
+      assertTrue(Settings.read(config).respectTeamNameVisibility());
+      config.set("visibility.show-self", false);
+      assertFalse(Settings.read(config).showSelf());
+    }
+  }
+}
