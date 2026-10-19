@@ -14,8 +14,35 @@ import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
 
 /** Disposable test-server plugin. Never included in SeasonalTitles.jar. */
-public final class RenderingFixture extends JavaPlugin {
+public final class RenderingFixture extends JavaPlugin implements org.bukkit.event.Listener {
   private final Map<UUID, ArmorStand> stands = new HashMap<>();
+  private final java.util.Set<UUID> blocked = new java.util.HashSet<>();
+
+  @Override
+  public void onEnable() {
+    Bukkit.getPluginManager().registerEvents(this, this);
+  }
+
+  @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
+  public void commandBlock(org.bukkit.event.player.PlayerCommandPreprocessEvent event) {
+    if (blocked.contains(event.getPlayer().getUniqueId())
+        && java.util.Set.of(
+                "title",
+                "titles",
+                "seasonaltitles:title",
+                "seasonaltitles:titles",
+                "sti",
+                "seasonaltitles:sti")
+            .contains(
+                event
+                    .getMessage()
+                    .substring(1)
+                    .split(" ", 2)[0]
+                    .toLowerCase(java.util.Locale.ROOT))) {
+      event.setCancelled(true);
+      event.getPlayer().sendMessage(Component.text("Fixture command blocked."));
+    }
+  }
 
   @Override
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -25,6 +52,37 @@ public final class RenderingFixture extends JavaPlugin {
     SeasonalTitlesPlugin titles =
         (SeasonalTitlesPlugin) Bukkit.getPluginManager().getPlugin("SeasonalTitles");
     switch (args[0]) {
+      case "checkpreview" -> {
+        var result = titles.getCommand("titles").tabComplete(player, "title", new String[] {""});
+        if (!result.equals(java.util.List.of("preview")))
+          throw new IllegalStateException("Unexpected preview-only suggestions: " + result);
+      }
+      case "checkpermissions" -> {
+        var api = Bukkit.getServicesManager().load(net.luckperms.api.LuckPerms.class);
+        var user =
+            java.util.Objects.requireNonNull(api.getUserManager().getUser(player.getUniqueId()));
+        var options = api.getContextManager().getQueryOptions(player);
+        var group = java.util.Objects.requireNonNull(api.getGroupManager().getGroup("default"));
+        if (player.isOp()
+            || !player.hasPermission("seasonaltitles.use")
+            || !user.getCachedData()
+                .getPermissionData(options)
+                .checkPermission("seasonaltitles.use")
+                .asBoolean()
+            || user.getNodes().stream().anyMatch(n -> n.getKey().equals("seasonaltitles.use"))
+            || user.getInheritedGroups(options).stream()
+                .noneMatch(g -> g.getName().equals("default"))
+            || group.getNodes().stream()
+                .noneMatch(
+                    n ->
+                        n.getKey().equals("seasonaltitles.use")
+                            && n.getValue()
+                            && n.getContexts().isEmpty()))
+          throw new IllegalStateException(
+              "Expected global inherited default-group use permission without OP or user override");
+      }
+      case "blockcommand" -> blocked.add(player.getUniqueId());
+      case "allowcommand" -> blocked.remove(player.getUniqueId());
       case "stats" -> {
         ArmorStand previous = stands.remove(player.getUniqueId());
         if (previous != null) previous.remove();

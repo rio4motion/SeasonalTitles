@@ -62,3 +62,8 @@ messages:
   unequipped: '<gray>Title hidden.</gray>'
   loading: '<yellow>SeasonalTitles is still loading.</yellow>'
   no-permission: '<red>You do not have permission.</red>'
+
+# Temporary scoped logging of command roots only (no arguments). Reload to toggle.
+# Shows cancellation/rewrites before dispatch; helps identify external command blockers.
+diagnostics:
+  command-trace: false

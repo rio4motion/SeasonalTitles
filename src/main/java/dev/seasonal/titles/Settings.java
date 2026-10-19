@@ -24,6 +24,7 @@ public record Settings(
     boolean lineOfSight,
     boolean showSelf,
     boolean respectTeamNameVisibility,
+    boolean commandTrace,
     String adminPermission,
     Map<String, String> messages) {
   public static Settings read(FileConfiguration c) {
@@ -68,6 +69,7 @@ public record Settings(
         c.getBoolean("visibility.line-of-sight", true),
         c.getBoolean("visibility.show-self", true),
         c.getBoolean("visibility.respect-team-nametag-visibility", false),
+        c.getBoolean("diagnostics.command-trace", false),
         c.getString("permissions.admin", "seasonaltitles.admin"),
         Map.copyOf(messages));
   }

@@ -7,9 +7,11 @@ description: Permanent SeasonalFFA collectibles with temporary role access and p
 commands:
   titles:
     aliases: [title]
+    permission: seasonaltitles.use;seasonaltitles.preview;seasonaltitles.admin
     description: Manage and preview cosmetic titles
     usage: /titles <list|equip|unequip|preview|update|reload|debug>
   sti:
+    permission: seasonaltitles.admin
     description: SeasonalTitles administration
     usage: /sti <enroll|addrole|removerole|roles|create|delete|give|revoke|custom>
 permissions:

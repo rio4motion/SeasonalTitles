@@ -1,5 +1,12 @@
 # SeasonalTitles progress
 
+## Command permissions — 1.0.4 (2026-10-19)
+- Investigated real plugin metadata, Bukkit parser/root checks, Paper's Brigadier bridge, internal checks and alias identity. Existing 1.0.3 works for a non-OP inheriting global default-group use on clean Paper; no OP-only root gate found. Production namespaced denial remains unconfirmed without its error/trace. CommandWhitelist appears in supplied plugin list and is a candidate, not an attributed cause.
+- Fixed root command visibility: explicit use OR preview OR configured admin root gate; admin-only `/sti`. Root gates update with custom admin configuration on reload; shared internal permissions and ownership enforcement retained.
+- Expanded admin `/titles debug <player>` with effective permissions and command owner/root gate for each alias. Optional `diagnostics.command-trace` logs scoped root cancellation/rewrites without altering events or logging arguments. Default off.
+- Verification: 45 tests passed; production JAR metadata/root gates/fixture exclusion checked. Real Paper 1.21.11 build 132 / LuckPerms 5.5.87: non-OP global default-group inheritance with no direct user override, all four aliases, owned equip/unequip, unowned/admin/preview denial, preview-only access, live revocations/tree refresh, and external cancellation despite granted use all passed. Packet/command checks do not attribute the production blocker.
+- Optional script: `scripts/permission-regression.cjs`, with integration fixture excluded from production. It paces synthetic non-OP commands to respect Paper spam limits. Artifact: `build/libs/SeasonalTitles-1.0.4.jar`.
+
 ## GitHub export
 - Published completed source and commit history to https://github.com/rio4motion/SeasonalTitles on `main`.
 - Preserved the user-created initial commit by merging histories; retained the complete plugin README.

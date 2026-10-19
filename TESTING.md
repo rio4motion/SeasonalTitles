@@ -37,3 +37,9 @@ Use two real 1.21.11 clients, the production LuckPerms contexts, and the exact S
 - [ ] Load-test realistic player counts using spark. Watch tick cost of viewer pairs/ray traces, SQLite queue latency and ownership cache memory; confirm no unexpected entity packets during steady movement.
 
 Do not deploy as visually verified until these checks pass. Keep a database backup and do not use `/reload` to deploy JAR updates.
+
+## Command permission regression (1.0.4)
+
+Run `./gradlew build integrationFixtureJar`. The normal suite parses the real plugin.yml through Bukkit's PluginCommandYamlParser and tests root `testPermissionSilent`, alias execution, subcommand completion, preview-only access, effective LuckPerms-style cached permission data, denial, and custom administrator gate updates. `scripts/permission-regression.cjs` additionally runs two-way commands against an isolated Paper 1.21.11/LuckPerms server using one **non-OP** protocol client. It requires the same loopback-only server setup and optional test fixture as the rendering script, with a config that has no diagnostics section yet. It verifies the actual LP API sees a global default-group use node, inherited membership, no direct user override, and an effective Bukkit grant. It changes synthetic player/title state and default-group test permissions; use only a disposable server.
+
+Manual production check: with the affected non-OP user, test `/title list`, `/titles list`, both namespaced aliases, owned equip/unequip, and preview only when authorized. Confirm admin roots/subcommands are hidden/denied. Use the debug/trace instructions in README to distinguish an internal permission decision from CommandWhitelist or another external rejection. A correct result on the isolated server does not establish the production server's blocking source.
