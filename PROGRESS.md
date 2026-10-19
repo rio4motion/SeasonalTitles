@@ -7,6 +7,9 @@
 - Verification: 45 tests passed; production JAR metadata/root gates/fixture exclusion checked. Real Paper 1.21.11 build 132 / LuckPerms 5.5.87: non-OP global default-group inheritance with no direct user override, all four aliases, owned equip/unequip, unowned/admin/preview denial, preview-only access, live revocations/tree refresh, and external cancellation despite granted use all passed. Packet/command checks do not attribute the production blocker.
 - Optional script: `scripts/permission-regression.cjs`, with integration fixture excluded from production. It paces synthetic non-OP commands to respect Paper spam limits. Artifact: `build/libs/SeasonalTitles-1.0.4.jar`.
 
+## Repository copy compatibility
+- User commit `25b0df8` uploaded a second project at `Downloads/SeasonalTitles-main/SeasonalTitles-main`, with independent rendering edits and a 1000-completion limit. Merged that history and applied only the permission update to both copies; preserved those unrelated edits. Build the nested copy to retain its rendering behavior. Both copies pass 45 automated tests and the live permission regression; the nested JAR was separately tested on Paper.
+
 ## GitHub export
 - Published completed source and commit history to https://github.com/rio4motion/SeasonalTitles on `main`.
 - Preserved the user-created initial commit by merging histories; retained the complete plugin README.

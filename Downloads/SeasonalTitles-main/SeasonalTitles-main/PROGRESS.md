@@ -1,5 +1,10 @@
 # SeasonalTitles progress
 
+## Command permissions — 1.0.4
+- Applied the same focused root gates, inherited-permission tests and command diagnostics as the repository-root project. Existing rendering edits and the 1000-completion limit in this copy are preserved.
+- Verification: 45 tests passed; built JAR metadata/root gates inspected. This JAR separately passed live Paper 1.21.11/LuckPerms tests for global inherited use, all aliases, ownership restrictions, preview-only access, live revocation/tree refresh and external cancellation diagnostics.
+- Root commands, aliases and internal permission code in the uploaded copy had no OP-only basic gate either. Production denial still requires its live error/trace; external CommandWhitelist remains a candidate.
+
 ## GitHub export
 - Published completed source and commit history to https://github.com/rio4motion/SeasonalTitles on `main`.
 - Preserved the user-created initial commit by merging histories; retained the complete plugin README.

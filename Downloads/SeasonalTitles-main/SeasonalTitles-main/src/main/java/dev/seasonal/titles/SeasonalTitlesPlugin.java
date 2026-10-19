@@ -52,6 +52,8 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
       command.setExecutor(commands);
       command.setTabCompleter(commands);
     }
+    CommandPermissions.configure(this);
+    getServer().getPluginManager().registerEvents(new CommandPermissions(this), this);
     getServer().getPluginManager().registerEvents(this, this);
     getServer().getPluginManager().registerEvents(new TitleSuggestions(this), this);
     database
@@ -115,7 +117,9 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
   }
 
   public List<String> renderingDiagnostics(Player owner, Player viewer) {
-    return renderer.diagnostics(owner, viewer, tick);
+    List<String> lines = new ArrayList<>(renderer.diagnostics(owner, viewer, tick));
+    lines.addAll(new CommandPermissions(this).diagnostics(owner));
+    return lines;
   }
 
   public Settings settings() {
@@ -168,6 +172,8 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
     reloadConfig();
     Settings candidate = Settings.read(getConfig());
     settings = candidate;
+    CommandPermissions.configure(this);
+    Bukkit.getOnlinePlayers().forEach(Player::updateCommands);
     renderer.clear();
     ranks.queueEnrolled();
   }

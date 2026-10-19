@@ -37,10 +37,7 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
   }
 
   private boolean commandAllowed(CommandSender sender, String permission) {
-    return sender.hasPermission(permission)
-        || (sender.isOp()
-            && (permission.equals("seasonaltitles.use")
-                || permission.equals("seasonaltitles.preview")));
+    return CommandPermissions.allowed(sender, permission);
   }
 
   private Player player(CommandSender s) {

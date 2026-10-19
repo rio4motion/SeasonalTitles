@@ -9,7 +9,7 @@ Seasonal titles, individually granted custom titles, temporary role access, oper
 ## Installation and build
 
 1. Run `./gradlew clean build` with a Java 21 JDK.
-2. Install LuckPerms, then copy `build/libs/SeasonalTitles-1.0.3.jar` to `plugins/`.
+2. Install LuckPerms, then copy `build/libs/SeasonalTitles-1.0.4.jar` to `plugins/`.
 3. Before the first start, optionally place/edit `plugins/SeasonalTitles/config.yml`. The initial season defaults to **Winter 2026**.
 4. Start Paper. Back up `plugins/SeasonalTitles/` before changes; stop the server for a simple consistent SQLite backup. A live backup must include SQLite WAL state or use SQLite's backup API.
 5. Enroll existing qualifying players explicitly with `/sti enroll <player-or-uuid>`.
@@ -138,3 +138,17 @@ Missing tier colors are automatic, case-insensitive defaults: Bronze `#CD7F32`, 
 Title suggestions follow each tier's first occurrence in the `ranks` YAML mapping, without changing rank eligibility or title IDs. Within each tier, optional `suggestions.title-order` lists stable IDs in the desired order; remaining titles follow by year/season. Custom titles follow ranked titles, alphabetically by ID. Historical tiers no longer mapped follow configured tiers, alphabetically. Reload rebuilds this order. Equip suggestions require use permission and access; preview permission grants suggestions for any existing title. Admin custom-title commands retain their broader scope.
 
 Paper's final suggestion event restores this order after Brigadier sorting, preserving replacement ranges, tooltips and prefix filtering. The 1.21.11 client code preserves matching-prefix order; packet tests verify server output. The actual in-game dropdown, camera angles and full nametag plugin stack still need the release checklist. Sneaking continues to hide titles for stealth; they return on standing. Upright text can appear edge-on from directly above/below.
+
+### Command permission troubleshooting (1.0.4)
+
+The shared `/titles` root (alias `/title`, including both `seasonaltitles:` forms) accepts **any** of `seasonaltitles.use`, `seasonaltitles.preview`, or the configured administrator node. Bukkit's semicolon-separated root permissions are OR, not AND. Basic actions still require use permission; title previews require preview permission; administrative actions and `/sti` require the configured administrator permission. Equip still checks ownership/role/operator access independently. LuckPerms inheritance and contexts are resolved through Bukkit's normal `hasPermission`; direct user nodes are not required. Reload applies a changed administrator node to both root commands and refreshes client command trees.
+
+The prior 1.0.3 JAR already accepted non-OP use inherited globally from the LuckPerms default group on clean Paper 1.21.11. Its metadata had no root permission gate; it did not impose an OP-only root permission. The registration gap exposed admin roots to unauthorized clients, even though internal execution was denied; 1.0.4 fixes that visibility gap. Both aliases resolve to the same plugin command on the tested server. Vanilla `minecraft:title` remains separate and restricted. A failure of the namespaced plugin command on a production server is not explained by vanilla `/title` alone.
+
+As OP/console, run `/titles debug <affected-online-player>`. In addition to rendering details, it reports the affected player's effective permissions, each alias's registered owner/root permission/eligibility, and plugins listening for command preprocessing. Missing/wrong owners indicate a registration conflict. A correct owner and `root-allowed=true` rule out that root gate for this player.
+
+To trace a live denial, temporarily add `diagnostics: {command-trace: true}` to config (or set its existing key), run `/titles reload`, and have the affected player retry `/seasonaltitles:title list`. The console records only player/root names, cancellation, rewrite, command owner, root eligibility and effective use/preview flags. It never changes/circumvents another plugin's decision. Set it back to false afterward. `cancelled=true` means a command preprocessing listener stopped dispatch before the SeasonalTitles executor. The trace cannot identify the exact cancelling listener; the debug report lists candidates. No trace can also mean an earlier packet/proxy rejection. A listener changing the event after MONITOR observation may not be reflected.
+
+The supplied SeasonalFFA plugin list includes **CommandWhitelist**. Check that plugin's configuration for `title`, `titles`, `seasonaltitles:title`, and `seasonaltitles:titles`. An external whitelist can deny non-OP commands despite LuckPerms granting use; its actual rules and the production denial have not been inspected. Permit the basic roots through that whitelist; SeasonalTitles continues to enforce every subcommand and title-access check.
+
+This uploaded project copy retains its existing rendering edits. Permission changes are mirrored in the repository-root project; build this copy to retain its rendering behavior.
