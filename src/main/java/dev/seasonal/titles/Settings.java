@@ -10,6 +10,8 @@ import org.bukkit.configuration.file.FileConfiguration;
 public record Settings(
     Season initial,
     Map<String, Tier> ranks,
+    List<Tier> tierOrder,
+    List<String> titleOrder,
     String format,
     Map<String, String> symbols,
     Map<Tier, String> colors,
@@ -25,7 +27,7 @@ public record Settings(
     String adminPermission,
     Map<String, String> messages) {
   public static Settings read(FileConfiguration c) {
-    Map<String, Tier> ranks = new HashMap<>();
+    Map<String, Tier> ranks = new LinkedHashMap<>();
     var section =
         Objects.requireNonNull(c.getConfigurationSection("ranks"), "Missing ranks configuration");
     for (String key : section.getKeys(false))
@@ -36,8 +38,8 @@ public record Settings(
       symbols.put(
           season.name(), c.getString("symbols." + season.name().toLowerCase(Locale.ROOT), ""));
     for (Tier t : Tier.values()) {
-      String color = c.getString("colors." + t.name().toLowerCase(Locale.ROOT), "white");
-      if (!color.matches("#[0-9a-fA-F]{6}|[a-z_]+"))
+      String color = configuredColor(c, t);
+      if (parseColor(color) == null)
         throw new IllegalArgumentException("Invalid tier color: " + color);
       colors.put(t, color);
     }
@@ -49,10 +51,15 @@ public record Settings(
             c.getString("initial-season.name", "Winter"),
             c.getString("initial-season.year", "2026")),
         Map.copyOf(ranks),
+        ranks.values().stream().distinct().toList(),
+        List.copyOf(c.getStringList("suggestions.title-order")),
         c.getString("format", "<color><symbol> <season> <year> • <tier></color>"),
         Map.copyOf(symbols),
         Map.copyOf(colors),
-        (float) number(c, "render.offset", 0.55, -1, 3),
+        (float)
+            Math.max(
+                number(c, "render.offset", 0.9, -1, 6),
+                number(c, "render.nametag-top", 0.5, 0, 5) + number(c, "render.gap", 0.4, 0.1, 1)),
         (float) number(c, "render.scale", 1, 0.1, 2),
         number(c, "render.distance", 32, 1, 64),
         (int) number(c, "render.interval-ticks", 1, 1, 1),
@@ -63,6 +70,35 @@ public record Settings(
         c.getBoolean("visibility.respect-team-nametag-visibility", false),
         c.getString("permissions.admin", "seasonaltitles.admin"),
         Map.copyOf(messages));
+  }
+
+  /** Color names are case-insensitive; unknown independent labels use a readable neutral color. */
+  static String automaticColor(String tier) {
+    return switch (tier.toLowerCase(Locale.ROOT)) {
+      case "bronze" -> "#CD7F32";
+      case "silver" -> "#C0C0C0";
+      case "gold" -> "#FFD700";
+      case "platinum" -> "#80E5E5";
+      case "diamond" -> "#55FFFF";
+      case "master" -> "#AA55FF";
+      case "legend" -> "#FFAA00";
+      default -> "#FFFFFF";
+    };
+  }
+
+  private static net.kyori.adventure.text.format.TextColor parseColor(String color) {
+    return color.startsWith("#")
+        ? net.kyori.adventure.text.format.TextColor.fromHexString(color)
+        : net.kyori.adventure.text.format.NamedTextColor.NAMES.value(color);
+  }
+
+  private static String configuredColor(FileConfiguration c, Tier tier) {
+    var colors = c.getConfigurationSection("colors");
+    if (colors != null)
+      for (String key : colors.getKeys(false))
+        if (key.equalsIgnoreCase(tier.name()))
+          return colors.getString(key, automaticColor(tier.name()));
+    return automaticColor(tier.name());
   }
 
   private static double number(
@@ -82,14 +118,15 @@ public record Settings(
               .serialize(component);
       if (plain.isBlank() || plain.contains("\n") || plain.contains("\r"))
         throw new IllegalArgumentException("Custom titles must render as one nonempty line.");
-      return component;
+      return component.colorIfAbsent(net.kyori.adventure.text.format.NamedTextColor.WHITE);
     }
     return mm.deserialize(
-        format.replace("<color>", "<color:" + colors.get(title.tier()) + ">"),
-        Placeholder.unparsed("symbol", symbols.get(title.season().name().name())),
-        Placeholder.unparsed("season", title.season().label().split(" ")[0]),
-        Placeholder.unparsed("year", Integer.toString(title.season().year())),
-        Placeholder.unparsed("tier", title.tier().label()));
+            format.replace("<color>", "<color:" + colors.get(title.tier()) + ">"),
+            Placeholder.unparsed("symbol", symbols.get(title.season().name().name())),
+            Placeholder.unparsed("season", title.season().label().split(" ")[0]),
+            Placeholder.unparsed("year", Integer.toString(title.season().year())),
+            Placeholder.unparsed("tier", title.tier().label()))
+        .colorIfAbsent(parseColor(colors.get(title.tier())));
   }
 
   public Component message(String key, String fallback) {

@@ -10,11 +10,17 @@ A real Paper 1.21.11 build 132 with LuckPerms 5.5.87 was used for console smoke 
 
 See [docs/RENDERING.md](docs/RENDERING.md) for the complete trace, one-client before/after evidence, diagnostics and optional live-server fixture. The owner now receives normal equipped titles; the old preview-only exclusion is removed. Thirty-five automated tests and live protocol checks passed. The 1.0.1 `team-name-hidden` failure was reproduced; 1.0.2 sends the owner the title under the same `NEVER` team rule, while crouching/invisibility still suppress it and the prefix/stats remain unchanged. The fixture is not part of the production JAR. Actual F5 appearance still needs the checklist below.
 
+## Presentation regression (1.0.3)
+
+Forty-one automated tests and the two-client Paper protocol regression pass. New checks cover palette overrides/fallback, legacy height clamping, configured tier/within-tier order after reload, permissions and prefix filtering, final Paper suggestion ranges/tooltips/order, observer updates, armor/movement, and equip/preview updates without entity recreation. Packet results do not verify the actual dropdown or visual spacing; use the checklist below.
+
 ## In-game release checklist
 
 Use two real 1.21.11 clients, the production LuckPerms contexts, and the exact SeasonalFFA stats/vanish/nametag plugins. Observe both normal and elevated permissions.
 
-- [ ] With only one client online, equip a seasonal and custom title; inspect in F5 while standing and creative flying. Run `/titles debug` and confirm selection, attachment, and self tracking. Then use a second observer when available; verify a separate line above the existing rank/name and stats remaining beneath it. Adjust `render.offset` and scale. Verify long titles do not wrap.
+- [ ] With only one client online, equip a seasonal and custom title; inspect in F5 while standing and creative flying. Run `/titles debug` and confirm selection, attachment, and self tracking. Then use a second observer when available; verify a separate line above the existing rank/name and stats remaining beneath it. Check `render.nametag-top`, `render.gap`, effective offset and scale with the actual custom nametag; test armor/helmets and multiple camera pitches. Verify long titles do not wrap.
+- [ ] Tab-complete `/title equip`, `/titles equip`, `/title preview` and admin custom commands in a real 1.21.11 client: verify configured tier order, within-tier order, custom group last, prefix filtering and access filtering. Reload with reordered rank mappings and confirm the displayed dropdown changes without changing rank eligibility.
+- [ ] Remove color overrides to test automatic palette; restore custom overrides and test custom-title styling. Verify equip and preview colors match, and changing titles updates without flicker or new entities.
 - [ ] Walk, sprint, jump, fall, turn rapidly and test high latency. Look for trailing, jitter or incorrect passenger offsets from both clients.
 - [ ] Crouch behind a wall and in the open: title must disappear immediately for everyone. Restore standing visibility. Confirm text is occluded by walls and cannot reveal a body hidden below cover.
 - [ ] Swim, crawl, glide, sleep, spin attack and ride boats/minecarts: title must remain hidden, then restore after returning to a safe standing pose.

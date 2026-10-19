@@ -57,7 +57,7 @@ public final class TitleRenderer {
                       e.setInvulnerable(true);
                       e.setGravity(false);
                       e.getPersistentDataContainer().set(marker, PersistentDataType.BYTE, (byte) 1);
-                      e.setBillboard(Display.Billboard.CENTER);
+                      e.setBillboard(Display.Billboard.VERTICAL);
                       e.setSeeThrough(false);
                       e.setShadowed(true);
                       e.setDefaultBackground(false);
@@ -136,7 +136,12 @@ public final class TitleRenderer {
     if (!viewer.hasLineOfSight(owner)) return "body-occluded";
     var start = viewer.getEyeLocation();
     var target =
-        owner.getLocation().add(0, owner.getHeight() + plugin.settings().offset() + 0.5, 0);
+        owner
+            .getLocation()
+            .add(
+                0,
+                owner.getHeight() + plugin.settings().offset() + 0.125 * plugin.settings().scale(),
+                0);
     var direction = target.toVector().subtract(start.toVector());
     double distance = direction.length();
     return distance < 0.01

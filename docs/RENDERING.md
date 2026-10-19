@@ -1,6 +1,14 @@
-# Rendering investigation — Paper 1.21.11 / SeasonalTitles 1.0.2
+# Rendering investigation — Paper 1.21.11 / SeasonalTitles 1.0.3
 
-## Current fix: scoreboard suppression (1.0.2)
+## Position, palette and suggestions (1.0.3)
+
+The old 0.55 translation placed the title near the vanilla label anchor (roughly player height + 0.5); CENTER billboard rotation also tilted the translation with camera pitch. Rendering now uses VERTICAL billboard orientation, so the offset remains upright, with minimum clearance `render.nametag-top + render.gap`. Defaults produce a 0.9 offset, including legacy configs with 0.55. Taller custom labels need their top configured: no Bukkit API exposes arbitrary nametag plugin geometry. TextDisplay text extends upward from its origin; the title-height LOS target includes the text's scaled center. Armor, standing/walking and creative flight retain attachment geometry; sneaking and unsafe poses retain concealment. Equip/preview changes update text metadata in place on the next renderer tick, without recreation.
+
+Tier defaults live in `Settings`, with explicit case-insensitive color overrides preserved. Custom text retains styles and gets a white fallback. The same cached formatter handles equipment and previews.
+
+`TitleSuggestions` orders IDs using the first occurrence of each tier in configured ranks, optional within-tier ID order, then chronological seasonal order; custom IDs follow alphabetically. `TitleCommands` applies this before the completion cap. Paper's `AsyncPlayerSendSuggestionsEvent` restores order after Brigadier's alphabetical sort; it only reorders existing suggestions, retaining ranges/tooltips. Its async path reads immutable volatile settings/catalog snapshots and calls no Bukkit entity APIs. Official 1.21.11 `CommandSuggestions.sortSuggestions` bytecode groups matching prefixes stably rather than sorting alphabetically again. A graphical dropdown has not been run here.
+
+## Scoreboard suppression fix (1.0.2)
 
 The reported `team-name-hidden` originates in `TitleRenderer.tick()` → `visibilityReason()` → `teamVisible()`. In 1.0.1 a false team result returned `team-name-hidden` before `showEntity()` could run. The display therefore existed and was attached but remained hidden by default: no client spawn/tracking, regardless of operator access.
 
@@ -18,7 +26,7 @@ A separate blanket `if (!owner.getPassengers().isEmpty()) continue` prevented cr
 
 1. `TitleCommands` validates the stable ID and centralized access policy. `Store.equip` persists the UUID/selection on the SQLite worker. `Database` publishes a snapshot before completing the request. “Saved.” confirms persistence; it is not evidence of client rendering.
 2. The renderer's normal server tick chooses the preview or persisted selection, checks catalog/access and owner state, and creates at most one nonpersistent TextDisplay. Operators bypass unlocks but not concealment.
-3. The display starts hidden by default, with nonempty Adventure text, unit scale, CENTER billboard, configured translation (default `0, 0.55, 0`), 32-block view range and depth-tested text. Zero interpolation/teleport duration is retained. No positional workaround was added.
+3. The display starts hidden by default, with nonempty Adventure text, unit scale, VERTICAL billboard, configured/clamped translation (default `0, 0.9, 0`), 32-block view range and depth-tested text. Zero interpolation/teleport duration is retained. No positional workaround was added.
 4. `Player.addPassenger` attaches the display. It now appends alongside existing passengers, preserving their order; it never calls `eject`, replaces a passenger list, or modifies other entities. Paper 1.21.11's `Entity.getDefaultPassengerAttachmentPoint` uses the passenger index and clamped attachment points. Appending a display does not renumber existing passengers. Plugins that replace the whole passenger list at packet level still require integration.
 5. `visibility.show-self` defaults to **true**, including for old config files without the new key. The normal title is eligible for its owner, just like a preview. An opt-out hides normal self-view but still permits a temporary preview.
 6. Self-view retains invisibility, vanish metadata/hook, spectator, sneak/pose, `canSee`, default visibility gates. Scoreboard-name rules are informational by default; explicit enforcement applies only to observers. It skips eye-to-own-body ray tracing: that is not a meaningful F5 camera visibility test. Other viewers retain body and title-height line-of-sight checks. The client's depth test remains enabled for everyone.
@@ -27,7 +35,7 @@ A separate blanket `if (!owner.getPassengers().isEmpty()) continue` prevented cr
 
 Creative/permission-based flying uses STANDING pose and remains supported. Elytra flight, crawling/swimming, riding and crouching remain intentionally suppressed. Sneak, invisibility and spectator changes remove the title, then recreate it when permitted. Teleport cleanup remains event-driven. No per-tick teleport loop or delayed spawn retries were introduced.
 
-The transform is applied in billboard space; the `offset` is not a replacement for a world-space teleport. This patch retains the existing geometry instead of guessing at new heights. Verify spacing from different camera angles and with resource packs. Packet checks cannot establish exact pixel placement or motion quality.
+The transform is applied in billboard space; VERTICAL orientation keeps its Y translation upright. The `offset` is not a replacement for a world-space teleport. Verify spacing from different camera angles and with resource packs. Packet checks cannot establish exact pixel placement or motion quality.
 
 ## Diagnostics
 
@@ -43,6 +51,8 @@ Run `/titles debug` while equipped, or `/titles debug <online-player>` as an adm
 This command is read-only and emits no background/per-tick logs. “visible” is the viewer policy only: selection/access, entity existence and tracking must also be checked. If it reports `tracked=true` and the F5 title still cannot be seen, capture this output with the camera angle and installed versions; investigate the client or packet-modifying plugins next. It is not evidence that the full plugin stack is visually compatible.
 
 ## Verification performed
+
+- 1.0.3: 41 tests pass. Real Paper checks with two protocol clients verify raised offset and upright billboard, observer title updates, identical preview metadata, color metadata, in-place equip/preview/expiration updates, no recurring display metadata while walking/wearing armor, and default tier ordering in outgoing completion packets (including aliases/namespaced commands and prefix filtering). Existing flight/teleport/concealment/prefix/stats checks still pass. Full graphical validation remains outstanding.
 
 - 35 automated tests pass, including self-view without preview, old-config defaults, custom-label team rules, explicit observer enforcement, self opt-out/preview behavior, concealment, body/title-height line-of-sight preservation, and administrator-only read-only diagnostics.
 - Reproduced the reported `team-name-hidden` failure with the 1.0.1 JAR and a `NEVER` custom-label team on real Paper. With 1.0.2, the same fixture sends the owner spawn/attachment packets and reports `vanilla-name-visible=false`, `mode=informational`, `policy=visible`, `tracked=true`. Crouching/invisibility still remove the display while that team remains active.

@@ -9,7 +9,7 @@ Seasonal titles, individually granted custom titles, temporary role access, oper
 ## Installation and build
 
 1. Run `./gradlew clean build` with a Java 21 JDK.
-2. Install LuckPerms, then copy `build/libs/SeasonalTitles-1.0.2.jar` to `plugins/`.
+2. Install LuckPerms, then copy `build/libs/SeasonalTitles-1.0.3.jar` to `plugins/`.
 3. Before the first start, optionally place/edit `plugins/SeasonalTitles/config.yml`. The initial season defaults to **Winter 2026**.
 4. Start Paper. Back up `plugins/SeasonalTitles/` before changes; stop the server for a simple consistent SQLite backup. A live backup must include SQLite WAL state or use SQLite's backup API.
 5. Enroll existing qualifying players explicitly with `/sti enroll <player-or-uuid>`.
@@ -107,7 +107,7 @@ SQLite work runs on one worker thread with WAL, full synchronous durability, for
 
 ## Rendering and compatibility
 
-The renderer uses **one nonpersistent TextDisplay passenger per displayed player**. The Minecraft client attaches movement through its passenger graph; there is no repeating teleport loop. Translation is relative to the player's attachment point. Text is depth-tested (`seeThrough=false`), billboarded, and hidden by default until explicitly shown to a permitted viewer. Existing scoreboard teams are read only.
+The renderer uses **one nonpersistent TextDisplay passenger per displayed player**. The Minecraft client attaches movement through its passenger graph; there is no repeating teleport loop. Translation is relative to the player's attachment point. The upright (VERTICAL) billboard keeps that offset vertical as the camera pitches. Effective height is `max(render.offset, render.nametag-top + render.gap)` (default 0.9 blocks above the anchor); old 0.55 offsets are raised automatically. Set `render.nametag-top` to the top of taller custom nametags, relative to that anchor. Bukkit cannot measure arbitrary plugin-rendered nametags. Armor does not change this offset. Text is depth-tested (`seeThrough=false`), billboarded, and hidden by default until explicitly shown to a permitted viewer. Existing scoreboard teams are read only.
 
 - Default range: 32 blocks. Viewer checks run every tick; only visibility changes send show/hide calls. Text components are cached and metadata is changed only when text changes.
 - Visibility checks include `Player.canSee`, invisibility, spectator mode, `vanished` metadata, world/range, body line of sight and a ray trace toward title height. Hide-entity events immediately hide the associated display for that viewer.
@@ -121,7 +121,7 @@ An invisible marker armor stand would still need viewer visibility and attachmen
 
 ## Configuration
 
-For the self-view and custom nametag fixes, complete selection-to-client trace, protocol evidence and `/titles debug`, see [rendering investigation](docs/RENDERING.md).
+For the positioning, suggestion-order, self-view and custom nametag fixes, complete selection-to-client trace, protocol evidence and `/titles debug`, see [rendering investigation](docs/RENDERING.md).
 
 See the commented [config.yml](src/main/resources/config.yml). It includes first-run season/year, rank mappings, MiniMessage format, tier colors, seasonal symbols, attachment offset/scale/range, self-view (default enabled), optional observer-only scoreboard enforcement (default disabled), optional additional line-of-sight checking, reconciliation batch size/interval, message templates and admin permission. Critical invisibility/sneak checks and the one-tick visibility interval cannot be disabled. Formatting uses plain-text substitutions for season, year, tier and symbol. Custom display text supports MiniMessage styles and symbols, but must render as one nonempty line.
 
@@ -130,3 +130,11 @@ Reload validates new settings before swapping the runtime settings and recreates
 ## Repository status
 
 GitHub creation was attempted for `rio4motion/SeasonalTitles`, but the connected integration returned **HTTP 403: Resource not accessible by integration** for `POST /user/repos`. Work and commits are preserved locally. After granting repository-creation access, create the repository and push this Git history. GitHub Actions is provided, but no hosted Actions run has occurred.
+
+### Colors and completion order
+
+Missing tier colors are automatic, case-insensitive defaults: Bronze `#CD7F32`, Silver `#C0C0C0`, Gold `#FFD700`, Platinum `#80E5E5`, Diamond `#55FFFF`, Master `#AA55FF`, Legend `#FFAA00`. Existing `colors` entries remain overrides; remove an override to use the automatic palette. No new tiers are introduced. Independent custom titles keep their MiniMessage colors and use white when uncolored. Equipped titles and previews use the same formatter.
+
+Title suggestions follow each tier's first occurrence in the `ranks` YAML mapping, without changing rank eligibility or title IDs. Within each tier, optional `suggestions.title-order` lists stable IDs in the desired order; remaining titles follow by year/season. Custom titles follow ranked titles, alphabetically by ID. Historical tiers no longer mapped follow configured tiers, alphabetically. Reload rebuilds this order. Equip suggestions require use permission and access; preview permission grants suggestions for any existing title. Admin custom-title commands retain their broader scope.
+
+Paper's final suggestion event restores this order after Brigadier sorting, preserving replacement ranges, tooltips and prefix filtering. The 1.21.11 client code preserves matching-prefix order; packet tests verify server output. The actual in-game dropdown, camera angles and full nametag plugin stack still need the release checklist. Sneaking continues to hide titles for stealth; they return on standing. Upright text can appear edge-on from directly above/below.

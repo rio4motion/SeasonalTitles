@@ -1,5 +1,13 @@
 # SeasonalTitles progress
 
+## Presentation and completion update — 1.0.3 (2026-10-19)
+- Upright VERTICAL billboard and effective offset `max(render.offset, render.nametag-top + render.gap)` (default 0.9) separate title from the normal name line, including old 0.55 configs. No team/prefix/stats writes, teleport loops or extra entities. Custom plugin name heights cannot be measured through Bukkit; configure their top if needed. Sneaking remains suppressed for stealth.
+- Automatic case-insensitive colors for the seven existing tiers; explicit color overrides retained. Unknown labels/uncolored custom text fall back to white; custom MiniMessage formatting preserved. Shared equip/preview formatter unchanged.
+- Configured ranks insertion order defines suggestion tier progression only. Optional `suggestions.title-order` sets within-tier order; remaining seasons are chronological, custom IDs alphabetical and last. Existing access/prefix filtering preserved, missing equip-use permission now checked in completion too.
+- `TitleSuggestions` restores order at Paper's final suggestion event after Brigadier sorts it. Only reorders existing entries, preserving ranges/tooltips; async path uses immutable volatile snapshots. Official 1.21.11 client bytecode preserves matching-prefix order.
+- 41 tests pass, build/JAR verified. Real Paper 1.21.11 build 132 / LuckPerms 5.5.87: two local protocol clients verified owner/observer updates, shared preview formatting, color metadata, raised offset/upright billboard, metadata-only equip/preview/restoration, no repeated metadata during walking/armor, creative flight/teleport, concealment, stats/prefix preservation, and ordered suggestion packets for aliases/namespaced commands with prefix filtering.
+- Artifact: `build/libs/SeasonalTitles-1.0.3.jar`. No graphical client available: exact spacing/angles, full plugin stack and final displayed dropdown remain in-game checks (TESTING.md). GitHub blocker unchanged.
+
 ## Custom nametag visibility fix — 1.0.2 (2026-10-19)
 - Exact cause: `TitleRenderer.tick` → `visibilityReason` → `teamVisible`; vanilla label suppression became `team-name-hidden` and prevented `showEntity` despite a valid attached display.
 - Team name visibility is now informational by default, including old configs. Explicit `visibility.respect-team-nametag-visibility` opt-in affects observers only; self-view remains eligible. Existing invisibility, vanish/canSee, crouch/pose, spectator and LOS checks remain active. No changes to team/prefix/stats or attachment geometry.

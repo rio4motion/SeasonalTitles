@@ -13,8 +13,8 @@ import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
-  private Settings settings;
-  private Snapshot state;
+  private volatile Settings settings;
+  private volatile Snapshot state;
   private Database database;
   private LuckPermsBridge ranks;
   private TitleRenderer renderer;
@@ -53,6 +53,7 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
       command.setTabCompleter(commands);
     }
     getServer().getPluginManager().registerEvents(this, this);
+    getServer().getPluginManager().registerEvents(new TitleSuggestions(this), this);
     database
         .open(getDataFolder().toPath().resolve("titles.db"), settings.initial())
         .whenComplete(

@@ -18,17 +18,21 @@ symbols:
   spring: '✿'
   summer: '☀'
   autumn: '❧'
-colors:
-  bronze: '#CD7F32'
-  silver: '#C0C0C0'
-  gold: '#FFD700'
-  platinum: '#E5E4E2'
-  diamond: '#67E8F9'
-  master: '#C084FC'
-  legend: '#FF5555'
+# Automatic tier palette is built in. Optional overrides (keys ignore case):
+# colors:
+#   legend: '#FF5555'
+colors: {}
+# Tier progression for suggestions follows first occurrence in ranks above.
+# Optional explicit order WITHIN a tier; unlisted titles follow by season/year.
+suggestions:
+  title-order: []
 render:
-  # Translation above the player's passenger attachment point, NOT absolute player Y.
-  offset: 0.55
+  # Minimum translation above the passenger anchor. Legacy lower values are clamped
+  # to nametag-top + gap. Upright billboard keeps vertical spacing stable with camera pitch.
+  offset: 0.9
+  # Top of the existing nametag relative to the passenger anchor. Raise for taller custom names.
+  nametag-top: 0.5
+  gap: 0.4
   scale: 1.0
   distance: 32
   # Safety visibility checks must run every tick. Geometry is attachment based.

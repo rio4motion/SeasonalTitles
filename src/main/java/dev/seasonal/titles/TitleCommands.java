@@ -372,7 +372,7 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
       if (admin && sub.equals("debug") && a.length == 2)
         org.bukkit.Bukkit.getOnlinePlayers().forEach(p -> options.add(p.getName()));
       if (a.length == 2
-          && (sub.equals("equip")
+          && ((sub.equals("equip") && commandAllowed(sender, "seasonaltitles.use"))
               || (sub.equals("preview") && commandAllowed(sender, "seasonaltitles.preview")))) {
         plugin.state().titles().values().stream()
             .filter(
@@ -407,10 +407,14 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
       if (a.length == 3 && sub.equals("delete")) options.add("confirm");
     }
     String prefix = a[a.length - 1].toLowerCase(Locale.ROOT);
+    Comparator<String> order =
+        TitleSuggestions.titleArgument(command.getName() + " " + String.join(" ", a))
+            ? TitleSuggestions.ids(plugin.settings(), plugin.state().titles())
+            : Comparator.naturalOrder();
     return options.stream()
         .distinct()
         .filter(s -> s.toLowerCase(Locale.ROOT).startsWith(prefix))
-        .sorted()
+        .sorted(order)
         .limit(100)
         .toList();
   }

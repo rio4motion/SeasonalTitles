@@ -122,4 +122,37 @@ class CommandTest {
     handler.onCommand(player, titles, "titles", new String[] {"equip", "2026-winter-legend"});
     verify(plugin, never()).database();
   }
+
+  @Test
+  void titleCompletionRespectsPermissionsPrefixAndConfiguredProgression() throws Exception {
+    when(plugin.settings()).thenReturn(Settings.read(PresentationTest.config()));
+    Season season = snapshot.season();
+    Title bronze = Title.seasonal(season, Tier.BRONZE),
+        silver = Title.seasonal(season, Tier.SILVER),
+        diamond = Title.seasonal(season, Tier.DIAMOND);
+    Title custom = Title.custom("aaa", "A");
+    Map<String, Title> catalog = new HashMap<>();
+    for (Title t : List.of(diamond, custom, silver, bronze)) catalog.put(t.id(), t);
+    when(plugin.state())
+        .thenReturn(
+            new Snapshot(
+                season, catalog, Map.of(), Map.of(), Map.of(), Set.of(), Set.of(), Map.of()));
+    when(plugin.canEquip(player, bronze)).thenReturn(true);
+    when(plugin.canEquip(player, diamond)).thenReturn(true);
+    assertTrue(
+        handler.onTabComplete(player, titles, "title", new String[] {"equip", ""}).isEmpty());
+    when(player.hasPermission("seasonaltitles.use")).thenReturn(true);
+    assertEquals(
+        List.of(bronze.id(), diamond.id()),
+        handler.onTabComplete(player, titles, "title", new String[] {"equip", ""}));
+    assertTrue(
+        handler.onTabComplete(player, titles, "title", new String[] {"preview", ""}).isEmpty());
+    when(player.hasPermission("seasonaltitles.preview")).thenReturn(true);
+    assertEquals(
+        List.of(bronze.id(), silver.id(), diamond.id(), custom.id()),
+        handler.onTabComplete(player, titles, "title", new String[] {"preview", ""}));
+    assertEquals(
+        List.of(diamond.id()),
+        handler.onTabComplete(player, titles, "title", new String[] {"preview", "2026-WINTER-D"}));
+  }
 }
