@@ -12,6 +12,7 @@ const mc = require('minecraft-protocol');
 const data = require('minecraft-data')('1.21.11');
 const dir = path.resolve(process.argv[2]);
 const beforeFix = process.argv.includes('--expect-hidden');
+const beforeTeamFix = process.argv.includes('--expect-team-hidden');
 const properties = fs.readFileSync(path.join(dir, 'server.properties'), 'utf8');
 assert.match(properties, /^server-ip=127\.0\.0\.1$/m);
 assert.match(properties, /^server-port=25585$/m);
@@ -111,7 +112,29 @@ async function run() {
   await until(()=>passengers.some(id=>entities.get(id)?.type===data.entitiesByName.armor_stand.id),'stats fixture attachment');
   const stats=passengers.find(id=>entities.get(id)?.type===data.entitiesByName.armor_stand.id);
   await command('titles equip '+title,'Saved.');
+  if (beforeTeamFix) {
+    await command('titles debug','team-name-hidden');
+    assert.equal(activeTitle(), undefined, 'old team policy unexpectedly showed the title');
+    console.log('REPRODUCED: valid attached title blocked by team-name-hidden with a custom-label NEVER team.');
+    dump('before-team-fix'); return;
+  }
   await until(()=>activeTitle()!==undefined,'title beside existing stats');
+  await command('titles debug','vanilla-name-visible=false');
+  await command('titles debug','mode=informational');
+  await command('titles debug','policy=visible');
+  await command('titles debug','tracked=true');
+  // Run stealth transitions while the custom-label team remains NEVER.
+  id=activeTitle();
+  client.write('player_input',{inputs:{shift:true}});
+  await until(()=>!entities.has(id),'NEVER team does not bypass crouching');
+  client.write('player_input',{inputs:{shift:false}});
+  await until(()=>activeTitle()!==undefined,'standing with NEVER team');
+  id=activeTitle();
+  consoleCommand('effect give TitleOwner invisibility 30 0 true');
+  await until(()=>!entities.has(id),'NEVER team does not bypass invisibility');
+  consoleCommand('effect clear TitleOwner');
+  await until(()=>activeTitle()!==undefined,'visible again with NEVER team');
+  console.log('PASS: NEVER team is informational; self tracking works and stealth still suppresses the title.');
   assert(passengers.includes(stats),'existing stats passenger was replaced');
   assert.equal(passengers[0],stats,'existing passenger order changed');
   await command('titles unequip','Title hidden.');

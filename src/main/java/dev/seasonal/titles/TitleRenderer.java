@@ -125,7 +125,11 @@ public final class TitleRenderer {
     if (!viewer.canSee(owner) || !owner.isVisibleByDefault()) return "player-hidden";
     if (viewer.getLocation().distanceSquared(owner.getLocation())
         > plugin.settings().distance() * plugin.settings().distance()) return "out-of-range";
-    if (!teamVisible(viewer, owner)) return "team-name-hidden";
+    // NAME_TAG_VISIBILITY controls the vanilla label, not whether the player is hidden.
+    // Custom nametag renderers often suppress that label. Never infer concealment from it.
+    // Servers using teams for stealth can explicitly opt in for observers; self-view is unaffected.
+    if (!self && plugin.settings().respectTeamNameVisibility() && !teamVisible(viewer, owner))
+      return "scoreboard-observer-rule";
     // There is no server-side F5 camera state. A ray from your eyes to your own body is not
     // a meaningful visibility test. Keep all concealment gates above; the client depth-tests text.
     if (self || !plugin.settings().lineOfSight()) return "visible";
@@ -202,7 +206,8 @@ public final class TitleRenderer {
               + ", see-through="
               + display.isSeeThrough());
     }
-    if (viewer != null)
+    if (viewer != null) {
+      lines.add(scoreboardDiagnostics(viewer, owner));
       lines.add(
           "Viewer: "
               + viewer.getName()
@@ -214,9 +219,28 @@ public final class TitleRenderer {
               + (display != null && viewer.canSee(display))
               + ", tracked="
               + (display != null && display.getTrackedBy().contains(viewer)));
+    }
     return lines;
   }
 
+  String scoreboardDiagnostics(Player viewer, Player owner) {
+    Team team = viewer.getScoreboard().getEntryTeam(owner.getName());
+    boolean respect = plugin.settings().respectTeamNameVisibility();
+    boolean applied = respect && !viewer.getUniqueId().equals(owner.getUniqueId());
+    return "Scoreboard: team="
+        + (team == null ? "none" : team.getName())
+        + ", name-tag-rule="
+        + (team == null ? "none" : team.getOption(Team.Option.NAME_TAG_VISIBILITY))
+        + ", vanilla-name-visible="
+        + teamVisible(viewer, owner)
+        + ", mode="
+        + (respect ? "observer-opt-in" : "informational")
+        + ", applied="
+        + applied
+        + ", writer/intent=unknown";
+  }
+
+  /** Reports only vanilla label visibility, not player/title concealment. Never mutates a team. */
   static boolean teamVisible(Player viewer, Player owner) {
     Team team = viewer.getScoreboard().getEntryTeam(owner.getName());
     if (team == null) return true;

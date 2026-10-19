@@ -38,8 +38,13 @@ visibility:
   # The server cannot detect F5; this also sends them in first person.
   # Previews include the owner even if this option is false. Concealment rules still apply.
   show-self: true
-  # Invisibility, vanish/canSee, spectator, crouching, nonstanding poses and
-  # scoreboard team name visibility are always respected and cannot be disabled.
+  # Custom nametag plugins often hide vanilla labels using scoreboard teams.
+  # Treat that as informational by default, NOT as proof that a player is hidden.
+  # Opt in only when this server deliberately uses team name rules for stealth.
+  # This optional rule applies to other viewers, never the owner's own title.
+  respect-team-nametag-visibility: false
+  # Invisibility, vanish/canSee, spectator, crouching and nonstanding poses
+  # are always respected and cannot be disabled by the setting above.
   # false still uses depth-tested text; true additionally ray traces blocks.
   line-of-sight: true
 reconcile:

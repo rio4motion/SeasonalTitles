@@ -46,6 +46,10 @@ public final class RenderingFixture extends JavaPlugin {
         var board = Bukkit.getScoreboardManager().getNewScoreboard();
         var team = board.registerNewTeam("st_fixture");
         team.prefix(Component.text("[Santa] "));
+        // Model a custom nametag plugin suppressing only the vanilla label.
+        team.setOption(
+            org.bukkit.scoreboard.Team.Option.NAME_TAG_VISIBILITY,
+            org.bukkit.scoreboard.Team.OptionStatus.NEVER);
         team.addEntry(player.getName());
         var objective =
             board.registerNewObjective("st_stats", Criteria.DUMMY, Component.text("Stats"));
@@ -63,6 +67,8 @@ public final class RenderingFixture extends JavaPlugin {
             || team == null
             || !team.prefix().equals(Component.text("[Santa] "))
             || !team.hasEntry(player.getName())
+            || team.getOption(org.bukkit.scoreboard.Team.Option.NAME_TAG_VISIBILITY)
+                != org.bukkit.scoreboard.Team.OptionStatus.NEVER
             || stats == null
             || stats.getDisplaySlot() != DisplaySlot.BELOW_NAME
             || stats.getScore(player.getName()).getScore() != 7)

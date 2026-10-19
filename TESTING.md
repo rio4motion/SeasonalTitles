@@ -6,9 +6,9 @@ Run `./gradlew clean build` using Java 21. Tests cover season/year ordering, inv
 
 A real Paper 1.21.11 build 132 with LuckPerms 5.5.87 was used for console smoke testing. See PROGRESS.md for final results. This tests API linkage and durable command/event handling, not visual rendering. The disposable server logged unrelated flat-world preset and Mojang public-key network errors; authenticated player login was not exercised. Two local offline protocol clients verified passenger spawn packets, successful vanilla teleport with an attached title, sneak-triggered removal and standing restoration, invisibility removal, and a preview that left the equipped database record unchanged. These are packet/API checks, not visual assertions. The optional `scripts/protocol-smoke.cjs` observer uses `minecraft-protocol` and `minecraft-data` installed separately; it is not part of the plugin or automated Gradle suite.
 
-## Self-view regression (1.0.1)
+## Rendering regressions (1.0.1–1.0.2)
 
-See [docs/RENDERING.md](docs/RENDERING.md) for the complete trace, one-client before/after evidence, diagnostics and optional live-server fixture. The owner now receives normal equipped titles; the old preview-only exclusion is removed. Thirty automated tests and live protocol checks passed. The fixture is not part of the production JAR. Actual F5 appearance still needs the checklist below.
+See [docs/RENDERING.md](docs/RENDERING.md) for the complete trace, one-client before/after evidence, diagnostics and optional live-server fixture. The owner now receives normal equipped titles; the old preview-only exclusion is removed. Thirty-five automated tests and live protocol checks passed. The 1.0.1 `team-name-hidden` failure was reproduced; 1.0.2 sends the owner the title under the same `NEVER` team rule, while crouching/invisibility still suppress it and the prefix/stats remain unchanged. The fixture is not part of the production JAR. Actual F5 appearance still needs the checklist below.
 
 ## In-game release checklist
 
@@ -19,7 +19,8 @@ Use two real 1.21.11 clients, the production LuckPerms contexts, and the exact S
 - [ ] Crouch behind a wall and in the open: title must disappear immediately for everyone. Restore standing visibility. Confirm text is occluded by walls and cannot reveal a body hidden below cover.
 - [ ] Swim, crawl, glide, sleep, spin attack and ride boats/minecarts: title must remain hidden, then restore after returning to a safe standing pose.
 - [ ] Teleport through vanilla `/tp`, plugin teleports and portals; switch dimensions. Confirm the attachment does not block the teleport, and only one display returns.
-- [ ] Test invisibility potion, `setInvisible`, vanish/unvanish, spectator, and each scoreboard name-visibility setting. Check both team relationships. Packet-only visibility integrations need the documented suppression hook.
+- [ ] Test invisibility potion, `setInvisible`, vanish/unvanish and spectator: titles must disappear regardless of team rules or operator status. Packet-only visibility integrations need the documented suppression hook.
+- [ ] With custom nametags active and a `NEVER` team rule, confirm titles appear while the vanilla label stays hidden. Debug must distinguish `vanilla-name-visible=false`, `applied=false` from `policy=visible` and `tracked=true`. Test every team relationship; repeat with observer-only enforcement explicitly enabled if the server uses teams for stealth. Self-view must remain eligible even in that mode.
 - [ ] Kill/respawn, disconnect/rejoin, restart, unload/reload chunks; confirm no orphan or duplicated display.
 - [ ] With the real stats plugin active, verify its display remains unchanged. If it uses player passengers, confirm both displays coexist and other passenger order remains unchanged; packet-only replacement requires integration.
 - [ ] Preview in third person and from the observer; overlap must fail. At ten seconds restore prior selection, or no display if prior selection is absent/inaccessible. Disconnect during preview and verify it does not return.

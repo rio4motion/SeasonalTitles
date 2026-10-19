@@ -1,6 +1,14 @@
 # SeasonalTitles progress
 
-## Rendering fix — 1.0.1 (2026-10-19)
+## Custom nametag visibility fix — 1.0.2 (2026-10-19)
+- Exact cause: `TitleRenderer.tick` → `visibilityReason` → `teamVisible`; vanilla label suppression became `team-name-hidden` and prevented `showEntity` despite a valid attached display.
+- Team name visibility is now informational by default, including old configs. Explicit `visibility.respect-team-nametag-visibility` opt-in affects observers only; self-view remains eligible. Existing invisibility, vanish/canSee, crouch/pose, spectator and LOS checks remain active. No changes to team/prefix/stats or attachment geometry.
+- Debug separates scoreboard rule/vanilla-label status/configured enforcement from actual policy/tracking. Bukkit does not expose rule writer/intent; actual plugin attribution remains unverified.
+- 35 automated tests pass. Real Paper 1.21.11 build 132 / LuckPerms 5.5.87: reproduced the failure with 1.0.1, then verified 1.0.2 owner spawn/tracking under the same NEVER team, concealment removal/restoration, stats passenger/prefix/team-rule/below-name preservation, teleport and creative flight.
+- Main changes: `TitleRenderer`, `Settings`, `config.yml`, visibility regression tests, optional rendering fixture/script. Trace and evidence: `docs/RENDERING.md`.
+- Artifact: `build/libs/SeasonalTitles-1.0.2.jar`. Actual F5 pixels, spacing/smoothness and the full production plugin stack still require the in-game checklist. GitHub creation remains blocked as recorded below.
+
+## Earlier rendering fix — 1.0.1 (2026-10-19)
 - Root cause reproduced on real Paper with one protocol client: equipped display attached, but `(viewer != owner || preview)` excluded its spawn from the owner's client. Operators did not bypass that filter.
 - Fixed default self-view; `visibility.show-self` defaults true for old/new configs. Self-view skips meaningless eye-to-own-body LOS, retaining concealment/team gates. Creative flight remains supported.
 - Removed blanket competing-passenger suppression; append only our display, preserving other entities/order. No teleport loops or arbitrary spawn delays.

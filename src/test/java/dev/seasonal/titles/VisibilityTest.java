@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class VisibilityTest {
   @Test
-  void respectsViewerScoreboardWithoutChangingTeams() {
+  void reportsVanillaLabelVisibilityWithoutChangingTeams() {
     Player viewer = mock(Player.class), owner = mock(Player.class);
     Scoreboard board = mock(Scoreboard.class);
     Team team = mock(Team.class);

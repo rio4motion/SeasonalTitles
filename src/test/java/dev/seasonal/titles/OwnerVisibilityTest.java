@@ -82,13 +82,95 @@ class OwnerVisibilityTest {
   }
 
   @Test
-  void scoreboardRestrictionsStillApplyToOwner() {
+  void customNametagTeamDoesNotBlockOwnerIncludingOperatorSelfView() {
     Team team = mock(Team.class);
     when(scoreboard.getEntryTeam("Owner")).thenReturn(team);
     when(team.getOption(Team.Option.NAME_TAG_VISIBILITY)).thenReturn(Team.OptionStatus.NEVER);
-    assertEquals("team-name-hidden", renderer.visibilityReason(owner, owner, false));
-    assertEquals("team-name-hidden", renderer.visibilityReason(owner, owner, true));
+    when(owner.isOp()).thenReturn(true);
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, true));
+    // Even explicit observer enforcement must not disable the owner's F5 title.
+    when(settings.respectTeamNameVisibility()).thenReturn(true);
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
     verify(team, never()).setOption(any(), any());
+  }
+
+  private Team customNametagTeam() {
+    Team team = mock(Team.class);
+    when(team.getName()).thenReturn("custom_labels");
+    when(scoreboard.getEntryTeam("Owner")).thenReturn(team);
+    when(team.getOption(Team.Option.NAME_TAG_VISIBILITY)).thenReturn(Team.OptionStatus.NEVER);
+    return team;
+  }
+
+  @Test
+  void teamRulesAreInformationalForObserversByDefault() {
+    Team team = customNametagTeam();
+    when(viewer.hasLineOfSight(owner)).thenReturn(true);
+    when(viewer.getEyeLocation()).thenReturn(new Location(world, 0, 81.6, 3));
+    when(owner.getHeight()).thenReturn(1.8);
+    for (Team.OptionStatus rule : Team.OptionStatus.values()) {
+      when(team.getOption(Team.Option.NAME_TAG_VISIBILITY)).thenReturn(rule);
+      assertEquals("visible", renderer.visibilityReason(viewer, owner, false));
+    }
+    verify(team, never()).setOption(any(), any());
+  }
+
+  @Test
+  void strictTeamEnforcementRequiresOptInAndOnlyAppliesToObservers() {
+    customNametagTeam();
+    when(settings.respectTeamNameVisibility()).thenReturn(true);
+    assertEquals("scoreboard-observer-rule", renderer.visibilityReason(viewer, owner, false));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    // Operator observer status never overrides explicit concealment policies.
+    when(viewer.isOp()).thenReturn(true);
+    when(viewer.canSee(owner)).thenReturn(false);
+    assertEquals("player-hidden", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void ignoredScoreboardDoesNotOverrideStealthOrLineOfSight() {
+    customNametagTeam();
+    when(viewer.hasLineOfSight(owner)).thenReturn(false);
+    assertEquals("body-occluded", renderer.visibilityReason(viewer, owner, false));
+    when(viewer.canSee(owner)).thenReturn(false);
+    assertEquals("player-hidden", renderer.visibilityReason(viewer, owner, false));
+    when(viewer.canSee(owner)).thenReturn(true);
+    when(plugin.titleHidden(owner.getUniqueId())).thenReturn(true);
+    assertEquals("hidden-by-integration", renderer.visibilityReason(owner, owner, false));
+    assertEquals("hidden-by-integration", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void titleHeightOcclusionRemainsEnforcedWithCustomNametags() {
+    customNametagTeam();
+    when(viewer.hasLineOfSight(owner)).thenReturn(true);
+    when(viewer.getEyeLocation()).thenReturn(new Location(world, 0, 81.6, 3));
+    when(owner.getHeight()).thenReturn(1.8);
+    when(world.rayTraceBlocks(
+            any(Location.class),
+            any(org.bukkit.util.Vector.class),
+            anyDouble(),
+            eq(org.bukkit.FluidCollisionMode.NEVER),
+            eq(true)))
+        .thenReturn(new org.bukkit.util.RayTraceResult(new org.bukkit.util.Vector(0, 82, 1)));
+    assertEquals("title-occluded", renderer.visibilityReason(viewer, owner, false));
+  }
+
+  @Test
+  void diagnosticsReportVanillaLabelRestrictionSeparatelyFromTitlePolicy() {
+    customNametagTeam();
+    String report = renderer.scoreboardDiagnostics(owner, owner);
+    assertTrue(report.contains("team=custom_labels"));
+    assertTrue(report.contains("name-tag-rule=NEVER"));
+    assertTrue(report.contains("vanilla-name-visible=false"));
+    assertTrue(report.contains("mode=informational"));
+    assertTrue(report.contains("applied=false"));
+    assertTrue(report.contains("writer/intent=unknown"));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    when(settings.respectTeamNameVisibility()).thenReturn(true);
+    assertTrue(renderer.scoreboardDiagnostics(viewer, owner).contains("applied=true"));
+    assertTrue(renderer.scoreboardDiagnostics(owner, owner).contains("applied=false"));
   }
 
   @Test
@@ -106,7 +188,11 @@ class OwnerVisibilityTest {
             getClass().getResourceAsStream("/config.yml"), StandardCharsets.UTF_8)) {
       YamlConfiguration config = YamlConfiguration.loadConfiguration(reader);
       config.set("visibility.show-self", null);
+      config.set("visibility.respect-team-nametag-visibility", null);
       assertTrue(Settings.read(config).showSelf());
+      assertFalse(Settings.read(config).respectTeamNameVisibility());
+      config.set("visibility.respect-team-nametag-visibility", true);
+      assertTrue(Settings.read(config).respectTeamNameVisibility());
       config.set("visibility.show-self", false);
       assertFalse(Settings.read(config).showSelf());
     }
