@@ -1,5 +1,10 @@
 # SeasonalTitles progress
 
+## GitHub export
+- Published completed source and commit history to https://github.com/rio4motion/SeasonalTitles on `main`.
+- Preserved the user-created initial commit by merging histories; retained the complete plugin README.
+- Earlier repository-creation blocker below is historical and resolved by the user creating the repository.
+
 ## Presentation and completion update — 1.0.3 (2026-10-19)
 - Upright VERTICAL billboard and effective offset `max(render.offset, render.nametag-top + render.gap)` (default 0.9) separate title from the normal name line, including old 0.55 configs. No team/prefix/stats writes, teleport loops or extra entities. Custom plugin name heights cannot be measured through Bukkit; configure their top if needed. Sneaking remains suppressed for stealth.
 - Automatic case-insensitive colors for the seven existing tiers; explicit color overrides retained. Unknown labels/uncolored custom text fall back to white; custom MiniMessage formatting preserved. Shared equip/preview formatter unchanged.
@@ -52,7 +57,7 @@
 - Ownership is indexed in memory; large-server load testing remains necessary.
 - No project license supplied; none invented.
 
-## External blocker / next steps
+## Historical creation blocker / remaining verification
 - GitHub `gh repo create SeasonalTitles --private --add-readme --gitignore Gradle --clone` failed with **HTTP 403: Resource not accessible by integration** (`POST /user/repos`). Lookup confirmed `rio4motion/SeasonalTitles` does not exist.
 - Implementation is committed locally. Repository creation/push and a hosted Actions run require a GitHub connection with repository-creation permission. No user action is needed to recover the local work.
 - Complete TESTING.md with real clients and production plugins before treating rendering as production verified.
