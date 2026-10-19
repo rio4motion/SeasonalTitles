@@ -1,0 +1,64 @@
+# Used ONLY when creating the database. Reload never changes the active season.
+initial-season:
+  name: Winter
+  year: 2026
+# Reloading rank mappings affects future reconciliation, never deletes awards.
+ranks:
+  speed: bronze
+  spear: silver
+  turtle: gold
+  legend: platinum
+  elf: diamond
+  dove: master
+  santa: legend
+# MiniMessage format. Placeholders are inserted as plain text.
+format: '<color><symbol> <season> <year> • <tier></color>'
+symbols:
+  winter: '❄'
+  spring: '✿'
+  summer: '☀'
+  autumn: '❧'
+# Automatic tier palette is built in. Optional overrides (keys ignore case):
+# colors:
+#   legend: '#FF5555'
+colors: {}
+# Tier progression for suggestions follows first occurrence in ranks above.
+# Optional explicit order WITHIN a tier; unlisted titles follow by season/year.
+suggestions:
+  title-order: []
+render:
+  # Minimum translation above the passenger anchor. Legacy lower values are clamped
+  # to nametag-top + gap. Upright billboard keeps vertical spacing stable with camera pitch.
+  offset: 0.9
+  # Top of the existing nametag relative to the passenger anchor. Raise for taller custom names.
+  nametag-top: 0.5
+  gap: 0.4
+  scale: 1.0
+  distance: 32
+  # Safety visibility checks must run every tick. Geometry is attachment based.
+  interval-ticks: 1
+visibility:
+  # Send equipped titles to their owner too, so the F5 camera can render them.
+  # The server cannot detect F5; this also sends them in first person.
+  # Previews include the owner even if this option is false. Concealment rules still apply.
+  show-self: true
+  # Custom nametag plugins often hide vanilla labels using scoreboard teams.
+  # Treat that as informational by default, NOT as proof that a player is hidden.
+  # Opt in only when this server deliberately uses team name rules for stealth.
+  # This optional rule applies to other viewers, never the owner's own title.
+  respect-team-nametag-visibility: false
+  # Invisibility, vanish/canSee, spectator, crouching and nonstanding poses
+  # are always respected and cannot be disabled by the setting above.
+  # false still uses depth-tested text; true additionally ray traces blocks.
+  line-of-sight: true
+reconcile:
+  seconds: 60
+  batch-size: 16
+permissions:
+  admin: seasonaltitles.admin
+messages:
+  saved: '<green>Saved.</green>'
+  preview: '<green>Preview started for 10 seconds.</green>'
+  unequipped: '<gray>Title hidden.</gray>'
+  loading: '<yellow>SeasonalTitles is still loading.</yellow>'
+  no-permission: '<red>You do not have permission.</red>'
