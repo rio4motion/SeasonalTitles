@@ -1,0 +1,24 @@
+name: SeasonalTitles
+version: '${version}'
+main: dev.seasonal.titles.SeasonalTitlesPlugin
+api-version: '1.21.11'
+depend: [LuckPerms]
+description: Permanent SeasonalFFA collectibles with temporary role access and previews.
+commands:
+  titles:
+    aliases: [title]
+    description: Manage and preview cosmetic titles
+    usage: /titles <list|equip|unequip|preview|update|reload>
+  sti:
+    description: SeasonalTitles administration
+    usage: /sti <enroll|addrole|removerole|roles|create|delete|give|revoke|custom>
+permissions:
+  seasonaltitles.use:
+    default: true
+    description: List and equip accessible titles
+  seasonaltitles.preview:
+    default: op
+    description: Preview any existing title for ten seconds
+  seasonaltitles.admin:
+    default: op
+    description: Seasonal transitions, enrollment, custom titles and role assignments

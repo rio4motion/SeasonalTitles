@@ -1,0 +1,51 @@
+# Used ONLY when creating the database. Reload never changes the active season.
+initial-season:
+  name: Winter
+  year: 2026
+# Reloading rank mappings affects future reconciliation, never deletes awards.
+ranks:
+  speed: bronze
+  spear: silver
+  turtle: gold
+  legend: platinum
+  elf: diamond
+  dove: master
+  santa: legend
+# MiniMessage format. Placeholders are inserted as plain text.
+format: '<color><symbol> <season> <year> • <tier></color>'
+symbols:
+  winter: '❄'
+  spring: '✿'
+  summer: '☀'
+  autumn: '❧'
+colors:
+  bronze: '#CD7F32'
+  silver: '#C0C0C0'
+  gold: '#FFD700'
+  platinum: '#E5E4E2'
+  diamond: '#67E8F9'
+  master: '#C084FC'
+  legend: '#FF5555'
+render:
+  # Translation above the player's passenger attachment point, NOT absolute player Y.
+  offset: 0.55
+  scale: 1.0
+  distance: 32
+  # Safety visibility checks must run every tick. Geometry is attachment based.
+  interval-ticks: 1
+visibility:
+  # Invisibility, vanish/canSee, spectator, crouching, nonstanding poses and
+  # scoreboard team name visibility are always respected and cannot be disabled.
+  # false still uses depth-tested text; true additionally ray traces blocks.
+  line-of-sight: true
+reconcile:
+  seconds: 60
+  batch-size: 16
+permissions:
+  admin: seasonaltitles.admin
+messages:
+  saved: '<green>Saved.</green>'
+  preview: '<green>Preview started for 10 seconds.</green>'
+  unequipped: '<gray>Title hidden.</gray>'
+  loading: '<yellow>SeasonalTitles is still loading.</yellow>'
+  no-permission: '<red>You do not have permission.</red>'
