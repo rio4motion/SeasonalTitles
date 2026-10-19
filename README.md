@@ -9,7 +9,7 @@ Seasonal titles, individually granted custom titles, temporary role access, oper
 ## Installation and build
 
 1. Run `./gradlew clean build` with a Java 21 JDK.
-2. Install LuckPerms, then copy `build/libs/SeasonalTitles-1.0.0.jar` to `plugins/`.
+2. Install LuckPerms, then copy `build/libs/SeasonalTitles-1.0.1.jar` to `plugins/`.
 3. Before the first start, optionally place/edit `plugins/SeasonalTitles/config.yml`. The initial season defaults to **Winter 2026**.
 4. Start Paper. Back up `plugins/SeasonalTitles/` before changes; stop the server for a simple consistent SQLite backup. A live backup must include SQLite WAL state or use SQLite's backup API.
 5. Enroll existing qualifying players explicitly with `/sti enroll <player-or-uuid>`.
@@ -57,6 +57,7 @@ Seasonal IDs are `YEAR-season-tier`, e.g. `2027-winter-legend`. Custom IDs are `
 | `/title preview <title-id>` | Preview any existing catalog title for 200 ticks (10 seconds at 20 TPS) |
 | `/titles preview <season> <year>` | Read-only transition summary; enrolled count is not an award guarantee |
 | `/titles update <season> <year>` | Request transition; repeat with `confirm` within 30 seconds |
+| `/titles debug [online-player]` | Read-only administrator rendering diagnostics |
 | `/titles reload` | Validate and reload presentation, mapping, performance and permission settings |
 | `/sti enroll <player-or-uuid>` | Explicitly verify/enroll an existing donor for current and future seasons |
 | `/sti addrole <group> <tier>` | Add one exact tier to a role |
@@ -84,13 +85,13 @@ Custom administration accepts `founder` or `custom:founder`; creation takes the 
 
 Role assignments stack independently: Diamond does **not** imply Gold, Silver or Bronze. Inherited role membership counts. A role never changes a LuckPerms group or grants a custom title. Removing a role or operator status immediately removes exclusive access on the next rendering check; independent ownership survives. A revoked but selected title remains stored as a dormant preference and is hidden unless another access source still applies.
 
-Operators can equip all existing titles without permanently owning them. Preview requires `seasonaltitles.preview` (default op), bypasses normal equip access, rejects overlaps, and does not write ownership or equipment. On expiration the current durable selection is rendered again, subject to current access. If the player deliberately changes equipment during a preview, the new selection takes effect afterward. Disconnect clears previews. First-person Minecraft does not show your own nametag; use third person or a second observer to inspect a preview.
+Operators can equip all existing titles without permanently owning them. Preview requires `seasonaltitles.preview` (default op), bypasses normal equip access, rejects overlaps, and does not write ownership or equipment. On expiration the current durable selection is rendered again, subject to current access. If the player deliberately changes equipment during a preview, the new selection takes effect afterward. Disconnect clears previews. Equipped titles and previews are now sent to their owner by default, supporting inspection in F5 without a second player. Paper cannot detect camera mode, so this also sends the entity in first person. Set `visibility.show-self: false` to opt out for normal equipment; previews still include the owner.
 
 | Permission | Default | Scope |
 |---|---|---|
 | `seasonaltitles.use` | everyone | list/equip/unequip |
 | `seasonaltitles.preview` | operators | any-title display preview |
-| `seasonaltitles.admin` | operators | updates, seasonal preview, reload, all `/sti` commands |
+| `seasonaltitles.admin` | operators | updates, seasonal preview, reload, diagnostics, all `/sti` commands |
 
 The administrator permission node is configurable. Operators bypass the use and title-preview command permission checks; administrator actions still use the configured administrator permission.
 
@@ -112,14 +113,16 @@ The renderer uses **one nonpersistent TextDisplay passenger per displayed player
 - Visibility checks include `Player.canSee`, the viewer's scoreboard name visibility, invisibility, spectator mode, `vanished` metadata, world/range, body line of sight and a ray trace toward title height. Hide-entity events immediately hide the associated display for that viewer.
 - Titles are **suppressed while crouching, swimming/crawling, gliding, sleeping, spin attacking, riding, or otherwise nonstanding**. This is deliberate conservative behavior, not verified pose-aware positioning. Sneak/pose/potion/game-mode events remove displays early.
 - Displays are removed around teleport, death, respawn, world changes, disconnect and shutdown. Passenger recreation after teleport can briefly hide a title. Tagged stale entities are removed on world/chunk load; displays are nonpersistent.
-- If a player already has another passenger, SeasonalTitles does not add a display. This prevents silently competing with an attachment-based stats/nametag plugin. Verify SeasonalFFA's stats implementation before deployment.
+- Existing passengers are preserved: the title is appended without ejecting or replacing other entities. An attached stats fixture, rank prefix and below-name objective were verified to survive equip/unequip. Packet-only plugins that overwrite passenger lists still require integration.
 - Packet-only vanish and packet-only scoreboard plugins may hide information without changing Bukkit state. Such integrations must call `SeasonalTitlesPlugin#setTitleHidden(uuid, true)` **on the main thread before hiding the player**, then `false` when revealed. Arbitrary packet-only visibility cannot be inferred reliably. Third-party visibility changes without events can take up to one server tick to be reflected.
 
 An invisible marker armor stand would still need viewer visibility and attachment validation, with additional hitbox/equipment concerns. Packet-only virtual passengers offer per-viewer control but require version-sensitive packet metadata and safe merging of other plugins' passenger lists. Neither is assumed to solve attachment offsets automatically. This implementation uses Paper's attachment API with conservative suppression; visual smoothness, exact spacing, own-preview behavior, portals and stats compatibility remain release gates. No zero-lag or perfect-visibility claim is made.
 
 ## Configuration
 
-See the commented [config.yml](src/main/resources/config.yml). It includes first-run season/year, rank mappings, MiniMessage format, tier colors, seasonal symbols, attachment offset/scale/range, optional additional line-of-sight checking, reconciliation batch size/interval, message templates and admin permission. Critical invisibility/sneak checks and the one-tick visibility interval cannot be disabled. Formatting uses plain-text substitutions for season, year, tier and symbol. Custom display text supports MiniMessage styles and symbols, but must render as one nonempty line.
+For the self-view fix, complete selection-to-client trace, protocol evidence and `/titles debug`, see [rendering investigation](docs/RENDERING.md).
+
+See the commented [config.yml](src/main/resources/config.yml). It includes first-run season/year, rank mappings, MiniMessage format, tier colors, seasonal symbols, attachment offset/scale/range, self-view (default enabled), optional additional line-of-sight checking, reconciliation batch size/interval, message templates and admin permission. Critical invisibility/sneak checks and the one-tick visibility interval cannot be disabled. Formatting uses plain-text substitutions for season, year, tier and symbol. Custom display text supports MiniMessage styles and symbols, but must render as one nonempty line.
 
 Reload validates new settings before swapping the runtime settings and recreates displays for new offsets. Rank changes in configuration affect future reconciliation, never erase ownership or infer historical purchases.
 

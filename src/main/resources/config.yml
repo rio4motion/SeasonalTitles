@@ -34,6 +34,10 @@ render:
   # Safety visibility checks must run every tick. Geometry is attachment based.
   interval-ticks: 1
 visibility:
+  # Send equipped titles to their owner too, so the F5 camera can render them.
+  # The server cannot detect F5; this also sends them in first person.
+  # Previews include the owner even if this option is false. Concealment rules still apply.
+  show-self: true
   # Invisibility, vanish/canSee, spectator, crouching, nonstanding poses and
   # scoreboard team name visibility are always respected and cannot be disabled.
   # false still uses depth-tested text; true additionally ray traces blocks.

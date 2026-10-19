@@ -1,5 +1,14 @@
 # SeasonalTitles progress
 
+## Rendering fix — 1.0.1 (2026-10-19)
+- Root cause reproduced on real Paper with one protocol client: equipped display attached, but `(viewer != owner || preview)` excluded its spawn from the owner's client. Operators did not bypass that filter.
+- Fixed default self-view; `visibility.show-self` defaults true for old/new configs. Self-view skips meaningless eye-to-own-body LOS, retaining concealment/team gates. Creative flight remains supported.
+- Removed blanket competing-passenger suppression; append only our display, preserving other entities/order. No teleport loops or arbitrary spawn delays.
+- Added admin-only `/titles debug [player]`, unit regressions and a separate optional live-server rendering fixture (never included in production JAR).
+- 30 tests passed. Before/after single-client packets verify spawn/text/transform/attachment; creative flight, teleport, sneak, invisibility, spectator and external concealment. Test stats passenger/prefix/below-name score survived equip/unequip.
+- Inspected actual Paper tracking/attachment code and official 1.21.11 client render paths. No fundamental local-player passenger rendering ban found.
+- Full trace/evidence: docs/RENDERING.md. Actual F5 pixel placement, latency smoothness and user's complete plugin stack remain manual checks. Build artifact: build/libs/SeasonalTitles-1.0.1.jar.
+
 ## Completed
 - Local repository initialized at `/workspace/SeasonalTitles`; Java 21, Gradle 8.14.3 wrapper with distribution checksum; Paper 1.21.11 and required LuckPerms dependency.
 - Permanent SQLite awards keyed by UUID/title, award timestamps, equipped selection, enrollment evidence, custom titles/grants, independent stacked role assignments and season audit.
@@ -22,7 +31,7 @@
 - Existing eligible users need explicit enrollment unless a qualifying membership-add event or a prior durable rankless observation provides current eligibility evidence.
 - Offline verification uses static LuckPerms contexts; unobserved historical/expired purchases cannot be reconstructed. Queue processing verifies rank when processed, not a historical boundary snapshot.
 - Active season is database state. Reload cannot roll it back. A transition waits for prior queued work to finish.
-- Suppress nonstanding/crouched/riding players and competing player passengers. Passenger positioning, actual motion smoothness, own-preview appearance and the real SeasonalFFA stats plugin still need the in-game checklist.
+- Suppress nonstanding/crouched/riding players; append alongside existing passengers as of 1.0.1. Passenger positioning, actual motion smoothness, own-preview appearance and the real SeasonalFFA stats plugin still need the in-game checklist.
 - Arbitrary packet-only hidden-player rules require the suppression hook. Eventless third-party visibility changes are checked every server tick; no perfect/zero-lag claim.
 - Ownership is indexed in memory; large-server load testing remains necessary.
 - No project license supplied; none invented.

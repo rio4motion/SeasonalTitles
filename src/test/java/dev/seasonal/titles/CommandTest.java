@@ -97,6 +97,17 @@ class CommandTest {
   }
 
   @Test
+  void diagnosticsAreAdminOnlyAndReadOnly() {
+    handler.onCommand(player, titles, "titles", new String[] {"debug"});
+    verify(plugin, never()).renderingDiagnostics(any(), any());
+    when(player.hasPermission("seasonaltitles.admin")).thenReturn(true);
+    when(plugin.renderingDiagnostics(player, player)).thenReturn(List.of("Display: attached"));
+    handler.onCommand(player, titles, "titles", new String[] {"debug"});
+    verify(plugin).renderingDiagnostics(player, player);
+    verify(plugin, never()).database();
+  }
+
+  @Test
   void operatorCanPreviewWithoutExplicitPermission() {
     when(player.isOp()).thenReturn(true);
     handler.onCommand(player, titles, "title", new String[] {"preview", "2026-winter-legend"});

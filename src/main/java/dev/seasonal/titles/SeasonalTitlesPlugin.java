@@ -113,6 +113,10 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
     getLogger().log(Level.SEVERE, "SeasonalTitles operation failed", error);
   }
 
+  public List<String> renderingDiagnostics(Player owner, Player viewer) {
+    return renderer.diagnostics(owner, viewer, tick);
+  }
+
   public Settings settings() {
     return settings;
   }

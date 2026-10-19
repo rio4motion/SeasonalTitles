@@ -93,6 +93,17 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
       save(sender, plugin.database().submit(s -> s.transition(current, next, actor)));
       return;
     }
+    if (sub.equals("debug")) {
+      permission(sender, plugin.settings().adminPermission());
+      if (a.length > 2) throw new IllegalArgumentException("Usage: /titles debug [online-player]");
+      Player owner = a.length == 1 ? player(sender) : org.bukkit.Bukkit.getPlayerExact(a[1]);
+      if (owner == null) throw new IllegalArgumentException("Player must be online.");
+      Player viewer = sender instanceof Player p ? p : owner;
+      plugin
+          .renderingDiagnostics(owner, viewer)
+          .forEach(line -> sender.sendMessage(Component.text(line)));
+      return;
+    }
     if (sub.equals("reload")) {
       permission(sender, plugin.settings().adminPermission());
       count(a, 1, "/titles reload");
@@ -354,10 +365,12 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
       else {
         if (commandAllowed(sender, "seasonaltitles.use"))
           options.addAll(List.of("list", "equip", "unequip"));
-        if (admin) options.addAll(List.of("update", "reload", "preview"));
+        if (admin) options.addAll(List.of("update", "reload", "preview", "debug"));
         if (commandAllowed(sender, "seasonaltitles.preview")) options.add("preview");
       }
     } else if (!sti) {
+      if (admin && sub.equals("debug") && a.length == 2)
+        org.bukkit.Bukkit.getOnlinePlayers().forEach(p -> options.add(p.getName()));
       if (a.length == 2
           && (sub.equals("equip")
               || (sub.equals("preview") && commandAllowed(sender, "seasonaltitles.preview")))) {

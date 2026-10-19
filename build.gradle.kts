@@ -1,6 +1,6 @@
 plugins { java }
 group = "dev.seasonal"
-version = "1.0.0"
+version = "1.0.1"
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
@@ -27,4 +27,15 @@ tasks.jar {
     from(bundled.map { if (it.isDirectory) it else zipTree(it) })
     exclude("META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA")
     manifest { attributes("Implementation-Version" to project.version) }
+}
+
+// Optional live-server fixture; deliberately excluded from the production artifact and normal build.
+val integration by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+}
+tasks.register<Jar>("integrationFixtureJar") {
+    dependsOn(tasks.named(integration.classesTaskName))
+    from(integration.output)
+    archiveFileName.set("seasonaltitles-rendering-fixture.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("integration"))
 }

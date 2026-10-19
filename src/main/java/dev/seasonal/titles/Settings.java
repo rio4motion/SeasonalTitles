@@ -20,6 +20,7 @@ public record Settings(
     int reconcileSeconds,
     int batchSize,
     boolean lineOfSight,
+    boolean showSelf,
     String adminPermission,
     Map<String, String> messages) {
   public static Settings read(FileConfiguration c) {
@@ -57,6 +58,7 @@ public record Settings(
         (int) number(c, "reconcile.seconds", 60, 10, 3600),
         (int) number(c, "reconcile.batch-size", 16, 1, 100),
         c.getBoolean("visibility.line-of-sight", true),
+        c.getBoolean("visibility.show-self", true),
         c.getString("permissions.admin", "seasonaltitles.admin"),
         Map.copyOf(messages));
   }
