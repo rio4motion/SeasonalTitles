@@ -90,3 +90,8 @@ These are packet/API observations. Additional passenger/visibility packets and f
 ## 2.1 animation sampling
 
 The default interval is now one tick. Effects advance using elapsed server ticks instead of scheduler invocation count, keeping speed stable when cadence changes. Gradient features travel left to right and cycle through eased palette blends without a seam. Fire, sparkle, flicker and neon scan use continuous waves rather than per-frame random noise. Typewriter holds the full title after revealing it. The title-wide styled/Unicode component traversal, work bounds, static skip behavior, two viewer variants, original geometry and safety checks are retained. Physical voucher unlocks are read from immutable snapshots and never query SQLite during a rendering frame.
+
+
+## 2.1.1 glitch
+
+Glitch now intentionally replaces individual letters/digits with deterministic pseudorandom ASCII letters/digits every elapsed tick (scaled by speed). Non-alphanumeric symbols, whitespace and multi-codepoint graphemes remain intact. A shared schedule adds Adventure `TextDecoration.OBFUSCATED` for seven of each eighty speed-scaled ticks, with a deterministic varying start. Non-burst characters explicitly clear that decoration. Original components/styles and the static fallback stay unchanged; visibility/geometry/scheduling are untouched. The optional `--glitch-only` protocol check samples scrambling and obfuscation metadata on Paper and verifies the static viewer variant. Graphical font behavior/appearance still needs a real client.

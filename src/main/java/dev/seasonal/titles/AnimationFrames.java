@@ -9,11 +9,14 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 
 /** Pure, deterministic transformations for animated Adventure components. */
 public final class AnimationFrames {
   private static final int MAX_CODE_POINTS = 256;
   private static final int MAX_COMPONENTS = 256;
+  private static final String GLITCH_GLYPHS =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   private static final int[][] FIRE = {
     {255, 244, 164}, {255, 190, 70}, {255, 123, 32}, {220, 48, 24}, {255, 213, 92}
   };
@@ -141,11 +144,30 @@ public final class AnimationFrames {
     }
 
     List<Component> colored = new ArrayList<>(units.size() + 1);
+    long glitchStep = 0;
+    boolean obfuscatedBurst = false;
+    if (effect == AnimationEffect.GLITCH) {
+      glitchStep = (long) Math.max(0, Math.floor(frame * speed));
+      int burstStart = 45 + Math.floorMod(mix64(glitchStep / 80), 25);
+      obfuscatedBurst = glitchStep % 80 >= burstStart && glitchStep % 80 < burstStart + 7;
+    }
     for (int i = 0; i < units.size(); i++) {
       int globalIndex = range == null ? i : range.start + i;
       int total = range == null ? units.size() : range.total;
       int rgb = colorAt(effect, globalIndex, total, phase, palette);
-      colored.add(Component.text(units.get(i)).color(TextColor.color(rgb)));
+      String glyph = units.get(i);
+      Component styled = Component.text(glyph).color(TextColor.color(rgb));
+      if (effect == AnimationEffect.GLITCH
+          && glyph.codePointCount(0, glyph.length()) == 1
+          && Character.isLetterOrDigit(glyph.codePointAt(0))) {
+        long random = mix64(glitchStep ^ mix64(globalIndex + 0x9e3779b97f4a7c15L));
+        char scrambled = GLITCH_GLYPHS.charAt(Math.floorMod(random, GLITCH_GLYPHS.length()));
+        styled =
+            Component.text(String.valueOf(scrambled))
+                .color(TextColor.color(rgb))
+                .decoration(TextDecoration.OBFUSCATED, obfuscatedBurst);
+      }
+      colored.add(styled);
     }
     if (!suffix.isEmpty()) colored.add(Component.text(suffix));
     Component parent = original.content("").children(List.of());
@@ -188,7 +210,7 @@ public final class AnimationFrames {
         color = interpolate(palette, heat);
       }
       case GLITCH -> {
-        // Retain the legacy effect ID as a readable neon scan; never scramble title text.
+        // Keep the neon palette underneath the independently timed scramble/obfuscation.
         double scan = Math.pow((1 + Math.cos(angle * 2 - position * 9)) / 2, 8);
         color = blend(cyclic(palette, position * 0.5 - phase), 0xFFFFFF, scan * 0.65);
       }

@@ -141,7 +141,8 @@ class AnimationFramesTest {
       for (int tick = 0; tick < 120; tick++) {
         var a = AnimationFrames.frame(base, effect, tick, List.of(), 1);
         var b = AnimationFrames.frame(base, effect, tick + 1, List.of(), 1);
-        assertEquals("A lovely title", plainText(a), "no character corruption in " + effect);
+        if (effect != AnimationEffect.GLITCH)
+          assertEquals("A lovely title", plainText(a), "no character corruption in " + effect);
         var before = coloredGlyphColors(a);
         var after = coloredGlyphColors(b);
         for (int i = 0; i < before.size(); i++)
@@ -166,6 +167,55 @@ class AnimationFramesTest {
     return Math.max(
         Math.abs(a.red() - b.red()),
         Math.max(Math.abs(a.green() - b.green()), Math.abs(a.blue() - b.blue())));
+  }
+
+  @Test
+  void glitchScramblesLettersAndNumbersEveryTickWithOccasionalVanillaObfuscation() {
+    Component base =
+        Component.text("Test123 • 😀 e\u0301 !")
+            .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
+    boolean sawBurst = false, sawNormal = false, sawLetter = false, sawNumber = false;
+    String previous = null;
+    for (int tick = 0; tick < 160; tick++) {
+      Component output = AnimationFrames.frame(base, AnimationEffect.GLITCH, tick, List.of(), 1);
+      String text = plainText(output);
+      assertTrue(
+          text.matches("[A-Za-z0-9]{7} • 😀 e\u0301 !"),
+          "symbols, spaces and multi-codepoint graphemes stay intact");
+      if (previous != null) assertNotEquals(previous, text, "scramble changes every tick");
+      previous = text;
+      sawLetter |= text.substring(0, 7).matches(".*[A-Za-z].*");
+      sawNumber |= text.substring(0, 7).matches(".*[0-9].*");
+      var state =
+          output
+              .children()
+              .getFirst()
+              .decoration(net.kyori.adventure.text.format.TextDecoration.OBFUSCATED);
+      sawBurst |= state == net.kyori.adventure.text.format.TextDecoration.State.TRUE;
+      sawNormal |= state == net.kyori.adventure.text.format.TextDecoration.State.FALSE;
+      assertEquals(
+          net.kyori.adventure.text.format.TextDecoration.State.TRUE,
+          output.decoration(net.kyori.adventure.text.format.TextDecoration.BOLD));
+      assertEquals(output, AnimationFrames.frame(base, AnimationEffect.GLITCH, tick, List.of(), 1));
+    }
+    assertTrue(sawBurst && sawNormal && sawLetter && sawNumber);
+    assertEquals("Test123 • 😀 e\u0301 !", plainText(base), "saved/static text is never mutated");
+  }
+
+  @Test
+  void glitchTimingUsesSpeedAndOneGlobalScheduleAcrossStyledSegments() {
+    Component base = Component.text("ABC").append(Component.text("123"));
+    for (int tick = 0; tick < 120; tick++) {
+      var output = AnimationFrames.frame(base, AnimationEffect.GLITCH, tick, List.of(), 1);
+      var first = output.children().getFirst();
+      var last = output.children().getLast().children().getFirst();
+      assertEquals(
+          first.decoration(net.kyori.adventure.text.format.TextDecoration.OBFUSCATED),
+          last.decoration(net.kyori.adventure.text.format.TextDecoration.OBFUSCATED));
+    }
+    assertEquals(
+        AnimationFrames.frame(base, AnimationEffect.GLITCH, 10, List.of(), 1),
+        AnimationFrames.frame(base, AnimationEffect.GLITCH, 20, List.of(), 0.5));
   }
 
   @Test

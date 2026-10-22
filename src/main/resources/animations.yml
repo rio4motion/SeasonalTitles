@@ -37,7 +37,7 @@ animations:
       enabled: true
       speed: 1
       colors: ['#FF5555', '#FFAA00', '#FFFF55']
-    # Legacy ID: a readable neon scan, without character corruption.
+    # Random letters/numbers each tick, with brief vanilla obfuscated-text bursts.
     glitch:
       enabled: true
       speed: 1

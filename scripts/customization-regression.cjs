@@ -42,7 +42,34 @@ async function start(){
  await until(()=>log.includes('[SeasonalTitles] Ready:'),'startup',60000);
 }
 async function stop(label){actors.forEach(a=>a.client.end());if(server.exitCode===null){consoleCommand('stop');await Promise.race([new Promise(r=>server.once('exit',r)),pause(30000)]);}fs.writeFileSync(path.join(dir,'customization-'+label+'.log'),log);if(server.exitCode===null)server.kill();}
+async function glitchRegression(){
+ await start();const owner=await connect('TitleOwner'),viewer=await connect('TitleObserver');
+ for(const a of [owner,viewer]){consoleCommand('op '+a.name);consoleCommand('gamemode creative '+a.name);}
+ consoleCommand('tp TitleOwner 0.5 80 0.5');consoleCommand('tp TitleObserver 4.5 80 0.5');consoleCommand('effect clear TitleOwner');
+ await cmd(viewer,'titles on','titles: on');await cmd(viewer,'titles animations on','animations: on');
+ const id='glitch_'+Date.now();await consoleAck('titles admin create '+id+' <bold><light_purple>Glitch123 • Test','Saved.');
+ await cmd(owner,'titles equip custom:'+id,'Saved.');await cmd(owner,'titles animation glitch','Saved.');
+ await until(()=>visible(owner,owner).length===1&&visible(viewer,owner).length===1,'glitch tracking');
+ const primary=visible(owner,owner)[0],from=owner.packets.length;await pause(5000);
+ const frames=owner.packets.slice(from).filter(p=>p.name==='entity_metadata'&&p.data.entityId===primary)
+   .flatMap(p=>p.data.metadata.filter(m=>m.key===23).map(m=>nbt.simplify(m.value)));
+ assert(frames.length>=40,'glitch produces changing metadata at one-tick cadence');
+ assert(new Set(frames.map(chatText)).size>=30,'letters and numbers change constantly');
+ assert(frames.every(c=>/^[A-Za-z0-9]{9} • [A-Za-z0-9]{4}$/.test(chatText(c))),'scrambles only alphanumeric glyphs');
+ function hasObfuscation(c){return c&&typeof c==='object'&&((c.obfuscated===true||c.obfuscated===1)||Object.values(c).some(v=>typeof v==='object'&&hasObfuscation(v)));}
+ assert(frames.some(hasObfuscation),'vanilla obfuscation flag sent during bursts');
+ assert(frames.some(c=>!hasObfuscation(c)),'vanilla obfuscation flag clears between bursts');
+ await cmd(viewer,'titles animations off','animations: off');
+ await until(()=>visible(viewer,owner).length===1&&visible(viewer,owner)[0]!==primary,'static alternative for glitch');
+ const alternate=visible(viewer,owner)[0];await until(()=>frame(viewer,alternate)!==undefined,'static alternative metadata');
+ const value=viewer.metadata.get(alternate).findLast(m=>m.key===23).value;
+ assert.equal(chatText(nbt.simplify(value)),'Glitch123 • Test','static audience keeps original text');
+ assert(!hasObfuscation(nbt.simplify(value)),'obfuscation does not leak to static audience');
+ console.log('PASS: Paper sends continuously scrambled text and intermittent vanilla obfuscation; animations-off viewer receives original static text.');
+ await stop('glitch');
+}
 async function run(){
+ if(process.argv.includes('--glitch-only'))return glitchRegression();
  const oldAwards=sql('SELECT uuid,title,awarded_at FROM awards ORDER BY uuid,title');
  const oldSeason=sql('SELECT season,year FROM state');
  if(sql("SELECT name FROM sqlite_master WHERE type='table' AND name='animation_unlocks'").length) sql("DELETE FROM animation_unlocks WHERE uuid IN (SELECT uuid FROM players WHERE lower(name) IN ('titleowner','titleobserver'))");

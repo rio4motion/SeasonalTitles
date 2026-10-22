@@ -1,6 +1,6 @@
 plugins { java }
 group = "dev.seasonal"
-version = "2.1.0"
+version = "2.1.1"
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")

@@ -4,7 +4,7 @@ Permanent SeasonalFFA title collectibles for **Paper 1.21.11 / Java 21**, with r
 
 ## Install and upgrade
 
-Build `./gradlew build` on Java 21, install `build/libs/SeasonalTitles-2.1.0.jar` alongside LuckPerms, and restart. No client mod, resource pack or ProtocolLib is required. Keep the existing `plugins/SeasonalTitles` folder and `titles.db`.
+Build `./gradlew build` on Java 21, install `build/libs/SeasonalTitles-2.1.1.jar` alongside LuckPerms, and restart. No client mod, resource pack or ProtocolLib is required. Keep the existing `plugins/SeasonalTitles` folder and `titles.db`.
 
 On upgrade, missing split files are created from existing values. Legacy `ranks` and color overrides migrate to `tiers.yml`; customized messages migrate to `messages.yml`. The original config stays unchanged and receives a one-time `config.yml.pre-2.0.bak` backup. Existing split files take precedence. The old 10-tick animation default migrates once to 1 tick, with `animations.yml.pre-2.1.bak`; custom speeds, palettes and other values are retained. Other intervals and later administrator changes are respected. Missing message/effect defaults are filled in memory. Invalid YAML/settings reject reload while the current settings stay active.
 
@@ -71,7 +71,7 @@ animations:
       colors: ['#55FFFF', '#AA55FF']
 ```
 
-Effects: `static`, `rainbow`, `gradient` (smooth left-to-right flow), `pulse`, `shimmer`, `sparkle`, `fire`, `glitch`, `flicker`, `typewriter`. Speed is >0–10 and uses elapsed server ticks (speed 1 is a six-second cycle), independent of update cadence; palettes accept named/HEX colors. Fire uses continuous warm color waves, pulse breathes gently, shimmer/sparkle brighten without harsh jumps, legacy glitch is a readable neon scan without character corruption, flicker is a gentle glow, and typewriter reveals then holds the full title. Presets are included. Static is the default, including migrated users. A `default` player selection uses the title's default effect, or the global seasonal default, subject to permission/restrictions. Explicit `static` always stays static.
+Effects: `static`, `rainbow`, `gradient` (smooth left-to-right flow), `pulse`, `shimmer`, `sparkle`, `fire`, `glitch`, `flicker`, `typewriter`. Speed is >0–10 and uses elapsed server ticks (color effects use a six-second cycle at speed 1), independent of update cadence; palettes accept named/HEX colors. Fire uses continuous warm color waves, pulse breathes gently, shimmer/sparkle brighten without harsh jumps, glitch constantly scrambles letters/numbers with brief vanilla obfuscated-text bursts while preserving spaces/symbols/emoji, flicker is a gentle glow, and typewriter reveals then holds the full title. Presets are included. Static is the default, including migrated users. A `default` player selection uses the title's default effect, or the global seasonal default, subject to permission/restrictions. Explicit `static` always stays static. Select `/titles animation glitch` for scrambling each tick at speed 1 and roughly 0.35-second obfuscated bursts every four seconds. Lower glitch speed slows both scrambling and bursts; original saved title text and animations-off viewers remain unchanged.
 
 ## Player commands
 
