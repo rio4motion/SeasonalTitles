@@ -7,6 +7,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: root
+            project: .
+          - name: uploaded
+            project: Downloads/SeasonalTitles-main/SeasonalTitles-main
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -14,13 +21,14 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew --no-daemon clean build
+      - run: bash ./gradlew --no-daemon clean build
+        working-directory: ${{ matrix.project }}
       - uses: actions/upload-artifact@v4
         with:
-          name: SeasonalTitles
-          path: build/libs/SeasonalTitles-*.jar
+          name: SeasonalTitles-${{ matrix.name }}
+          path: ${{ matrix.project }}/build/libs/SeasonalTitles-*.jar
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
-          path: build/reports/tests/test
+          name: test-results-${{ matrix.name }}
+          path: ${{ matrix.project }}/build/reports/tests/test

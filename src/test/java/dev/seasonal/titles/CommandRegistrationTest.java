@@ -66,7 +66,7 @@ class CommandRegistrationTest {
         List.of("titles", "title", "seasonaltitles:titles", "seasonaltitles:title")) {
       assertTrue(titles.execute(player, alias, new String[] {"list"}));
       assertEquals(
-          List.of("equip", "list", "unequip"),
+          List.of("animation", "animations", "equip", "help", "list", "off", "on", "unequip"),
           titles.tabComplete(player, alias, new String[] {""}));
     }
     verify(player, times(4)).sendMessage(net.kyori.adventure.text.Component.text("Titles 1/1 (0)"));

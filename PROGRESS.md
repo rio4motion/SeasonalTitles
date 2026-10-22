@@ -1,73 +1,13 @@
-# SeasonalTitles progress
+# SeasonalTitles progress — 2.0 overhaul (2026-10-22)
 
-## Command permissions — 1.0.4 (2026-10-19)
-- Investigated real plugin metadata, Bukkit parser/root checks, Paper's Brigadier bridge, internal checks and alias identity. Existing 1.0.3 works for a non-OP inheriting global default-group use on clean Paper; no OP-only root gate found. Production namespaced denial remains unconfirmed without its error/trace. CommandWhitelist appears in supplied plugin list and is a candidate, not an attributed cause.
-- Fixed root command visibility: explicit use OR preview OR configured admin root gate; admin-only `/sti`. Root gates update with custom admin configuration on reload; shared internal permissions and ownership enforcement retained.
-- Expanded admin `/titles debug <player>` with effective permissions and command owner/root gate for each alias. Optional `diagnostics.command-trace` logs scoped root cancellation/rewrites without altering events or logging arguments. Default off.
-- Verification: 45 tests passed; production JAR metadata/root gates/fixture exclusion checked. Real Paper 1.21.11 build 132 / LuckPerms 5.5.87: non-OP global default-group inheritance with no direct user override, all four aliases, owned equip/unequip, unowned/admin/preview denial, preview-only access, live revocations/tree refresh, and external cancellation despite granted use all passed. Packet/command checks do not attribute the production blocker.
-- Optional script: `scripts/permission-regression.cjs`, with integration fixture excluded from production. It paces synthetic non-OP commands to respect Paper spam limits. Artifact: `build/libs/SeasonalTitles-1.0.4.jar`.
-
-## Repository copy compatibility
-- User commit `25b0df8` uploaded a second project at `Downloads/SeasonalTitles-main/SeasonalTitles-main`, with independent rendering edits and a 1000-completion limit. Merged that history and applied only the permission update to both copies; preserved those unrelated edits. Build the nested copy to retain its rendering behavior. Both copies pass 45 automated tests and the live permission regression; the nested JAR was separately tested on Paper.
-
-## GitHub export
-- Published completed source and commit history to https://github.com/rio4motion/SeasonalTitles on `main`.
-- Preserved the user-created initial commit by merging histories; retained the complete plugin README.
-- Earlier repository-creation blocker below is historical and resolved by the user creating the repository.
-
-## Presentation and completion update — 1.0.3 (2026-10-19)
-- Upright VERTICAL billboard and effective offset `max(render.offset, render.nametag-top + render.gap)` (default 0.9) separate title from the normal name line, including old 0.55 configs. No team/prefix/stats writes, teleport loops or extra entities. Custom plugin name heights cannot be measured through Bukkit; configure their top if needed. Sneaking remains suppressed for stealth.
-- Automatic case-insensitive colors for the seven existing tiers; explicit color overrides retained. Unknown labels/uncolored custom text fall back to white; custom MiniMessage formatting preserved. Shared equip/preview formatter unchanged.
-- Configured ranks insertion order defines suggestion tier progression only. Optional `suggestions.title-order` sets within-tier order; remaining seasons are chronological, custom IDs alphabetical and last. Existing access/prefix filtering preserved, missing equip-use permission now checked in completion too.
-- `TitleSuggestions` restores order at Paper's final suggestion event after Brigadier sorts it. Only reorders existing entries, preserving ranges/tooltips; async path uses immutable volatile snapshots. Official 1.21.11 client bytecode preserves matching-prefix order.
-- 41 tests pass, build/JAR verified. Real Paper 1.21.11 build 132 / LuckPerms 5.5.87: two local protocol clients verified owner/observer updates, shared preview formatting, color metadata, raised offset/upright billboard, metadata-only equip/preview/restoration, no repeated metadata during walking/armor, creative flight/teleport, concealment, stats/prefix preservation, and ordered suggestion packets for aliases/namespaced commands with prefix filtering.
-- Artifact: `build/libs/SeasonalTitles-1.0.3.jar`. No graphical client available: exact spacing/angles, full plugin stack and final displayed dropdown remain in-game checks (TESTING.md). GitHub blocker unchanged.
-
-## Custom nametag visibility fix — 1.0.2 (2026-10-19)
-- Exact cause: `TitleRenderer.tick` → `visibilityReason` → `teamVisible`; vanilla label suppression became `team-name-hidden` and prevented `showEntity` despite a valid attached display.
-- Team name visibility is now informational by default, including old configs. Explicit `visibility.respect-team-nametag-visibility` opt-in affects observers only; self-view remains eligible. Existing invisibility, vanish/canSee, crouch/pose, spectator and LOS checks remain active. No changes to team/prefix/stats or attachment geometry.
-- Debug separates scoreboard rule/vanilla-label status/configured enforcement from actual policy/tracking. Bukkit does not expose rule writer/intent; actual plugin attribution remains unverified.
-- 35 automated tests pass. Real Paper 1.21.11 build 132 / LuckPerms 5.5.87: reproduced the failure with 1.0.1, then verified 1.0.2 owner spawn/tracking under the same NEVER team, concealment removal/restoration, stats passenger/prefix/team-rule/below-name preservation, teleport and creative flight.
-- Main changes: `TitleRenderer`, `Settings`, `config.yml`, visibility regression tests, optional rendering fixture/script. Trace and evidence: `docs/RENDERING.md`.
-- Artifact: `build/libs/SeasonalTitles-1.0.2.jar`. Actual F5 pixels, spacing/smoothness and the full production plugin stack still require the in-game checklist. GitHub creation remains blocked as recorded below.
-
-## Earlier rendering fix — 1.0.1 (2026-10-19)
-- Root cause reproduced on real Paper with one protocol client: equipped display attached, but `(viewer != owner || preview)` excluded its spawn from the owner's client. Operators did not bypass that filter.
-- Fixed default self-view; `visibility.show-self` defaults true for old/new configs. Self-view skips meaningless eye-to-own-body LOS, retaining concealment/team gates. Creative flight remains supported.
-- Removed blanket competing-passenger suppression; append only our display, preserving other entities/order. No teleport loops or arbitrary spawn delays.
-- Added admin-only `/titles debug [player]`, unit regressions and a separate optional live-server rendering fixture (never included in production JAR).
-- 30 tests passed. Before/after single-client packets verify spawn/text/transform/attachment; creative flight, teleport, sneak, invisibility, spectator and external concealment. Test stats passenger/prefix/below-name score survived equip/unequip.
-- Inspected actual Paper tracking/attachment code and official 1.21.11 client render paths. No fundamental local-player passenger rendering ban found.
-- Full trace/evidence: docs/RENDERING.md. Actual F5 pixel placement, latency smoothness and user's complete plugin stack remain manual checks. Build artifact: build/libs/SeasonalTitles-1.0.1.jar.
-
-## Completed
-- Local repository initialized at `/workspace/SeasonalTitles`; Java 21, Gradle 8.14.3 wrapper with distribution checksum; Paper 1.21.11 and required LuckPerms dependency.
-- Permanent SQLite awards keyed by UUID/title, award timestamps, equipped selection, enrollment evidence, custom titles/grants, independent stacked role assignments and season audit.
-- Serialized asynchronous database worker, coalesced snapshots/no-op suppression, transactional season state plus durable reconciliation queue, exact-once awards, stale-read rejection and retry backoff.
-- LuckPerms inherited/context-aware rank resolution, live offline membership additions, rankless-to-eligible verification, explicit `/sti enroll` migration; no backfill.
-- Player/admin commands, permissions, exact-action confirmations, completion, role/operator access, MiniMessage customization and 200-tick previews without durable writes.
-- Attached TextDisplays; viewer-specific visibility checks; lifecycle cleanup; safe pose suppression; packet-only vanish integration hook. No scoreboard/prefix/stat writes.
-- README, TESTING.md, commented config, plugin metadata and GitHub Actions build/artifact workflow.
-
-## Verification
-- `./gradlew clean build` and final incremental `./gradlew build` succeeded with Java 21. Final suite: **23 tests, 0 failures/errors/skips**.
-- Tests: hierarchy/inheritance, role/operator/custom access, permissions/completions, confirmations, preview restoration, no backfill, offline eligibility, persistence/deduplication, injected transactional failures/recovery and worker shutdown/publication.
-- Packaged JAR inspected for resolved metadata, SQLite driver/native library and absence of bundled Paper/LuckPerms/SLF4J API classes.
-- Real Paper **1.21.11 build 132** / LuckPerms **5.5.87** smoke: startup and shutdown, offline Santa membership award, stacked roles, custom creation/grant, future-year transition/confirmation, backward rejection, reload, durable restart with no duplicate awards. Final eligibility-path change was smoke-tested again.
-- Two loopback-only protocol clients: TextDisplay passenger packet, attached `/tp` success and recreation, sneak removal/standing restoration, invisibility removal, preview spawn and unchanged durable equipped selection. Visual rendering was NOT verified.
-- Test-server warnings: flat preset configuration and Mojang public-key network access; no SeasonalTitles enable/runtime exception observed. Offline-mode clients do not verify authenticated login.
-- Optional packet observer: `scripts/protocol-smoke.cjs`. Disposable server, databases, dependencies and logs stay in ignored `run/`.
-
-## Decisions and limits
-- Existing eligible users need explicit enrollment unless a qualifying membership-add event or a prior durable rankless observation provides current eligibility evidence.
-- Offline verification uses static LuckPerms contexts; unobserved historical/expired purchases cannot be reconstructed. Queue processing verifies rank when processed, not a historical boundary snapshot.
-- Active season is database state. Reload cannot roll it back. A transition waits for prior queued work to finish.
-- Suppress nonstanding/crouched/riding players; append alongside existing passengers as of 1.0.1. Passenger positioning, actual motion smoothness, own-preview appearance and the real SeasonalFFA stats plugin still need the in-game checklist.
-- Arbitrary packet-only hidden-player rules require the suppression hook. Eventless third-party visibility changes are checked every server tick; no perfect/zero-lag claim.
-- Ownership is indexed in memory; large-server load testing remains necessary.
-- No project license supplied; none invented.
-
-## Historical creation blocker / remaining verification
-- GitHub `gh repo create SeasonalTitles --private --add-readme --gitignore Gradle --clone` failed with **HTTP 403: Resource not accessible by integration** (`POST /user/repos`). Lookup confirmed `rio4motion/SeasonalTitles` does not exist.
-- Implementation is committed locally. Repository creation/push and a hosted Actions run require a GitHub connection with repository-creation permission. No user action is needed to recover the local work.
-- Complete TESTING.md with real clients and production plugins before treating rendering as production verified.
+- Repository: https://github.com/rio4motion/SeasonalTitles. Base `c1d8bed`; both root and uploaded nested project copies must be updated. Nested copy retains CENTER billboard, its crouching behavior and 1000 suggestions; root retains VERTICAL and crouch suppression. Do not change geometry.
+- Existing permanent SQLite UUID awards, first-eligibility enrollment, offline reconciliation, role stacking, command permissions/aliases, confirmed seasons and preview storage remain intact.
+- Added `ConfigurationFiles`: strict split YAML loading, one-time legacy config backup, rank/color/message migration, existing-file preservation, atomic writes. New resources: tiers/titles/animations/messages.yml. Settings validates multiple groups, conflicts, stable tiers, formatting and effects.
+- Added preference table/schema 2 and immutable snapshot preferences. Definition upserts retain awards/equipment; editing/revocation/deletion remain distinct. Config deletion alone does not erase DB records.
+- Added bounded deterministic `AnimationFrames`/`AnimationEffect` (nine effects plus static), configurable `AnimationSettings`, permission/allowlist policy and shared animation task separate from safety ticks.
+- Renderer preserves original spawn geometry. Animated primary + lazy static alternative allows independent viewer preferences through native Paper tracking; at most two displays per owner. Static updates skipped; no DB in animation loop. Existing safety gates retained.
+- Modern `/titles` help/browse/admin routes, effects, viewing preferences, rank mapping persistence, definition editing and destructive confirmation added; legacy commands preserved. Player input does not become arbitrary MiniMessage.
+- New tests cover config/schema migration, rank rename/multiple groups, definitions/gradients/grants, preference persistence/permission restoration, effects/Unicode and UX. Final suites: 64 tests per project copy, zero failures/errors/skips.
+- Real Paper 1.21.11/LP 5.5.87 tests passed for both variants: static idle, independent audiences/exact original static formatting, zero sampled animated text updates at disabled viewer, two simultaneously animated owners, self independence, toggles, LOS/invisibility/crouch/spectator/vanish hook, attached teleport and stats. Preview/permission restoration, inherited wildcard with specific denial, rank mutations/conflicts, restart/reconnect and prior award timestamps/season verified. Root crouch suppression and uploaded crouch behavior remain distinct.
+- Both JARs inspected for 2.0.0 metadata, all split resources, SQLite driver and no bundled Bukkit/test fixture classes. Geometry and three pre-existing variant differences compared. GitHub Actions now builds both copies with distinct artifacts. Remaining: commit/push. No production deployment.
+- Unverified: graphical animation quality, actual dropdown, full server plugin stack and large-server load; Java grapheme segmentation has complex emoji limits. Earlier permission-denial source remains unconfirmed without production trace; CommandWhitelist is a candidate.

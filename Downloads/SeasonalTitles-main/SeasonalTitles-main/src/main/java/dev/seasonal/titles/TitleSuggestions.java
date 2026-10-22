@@ -41,6 +41,16 @@ final class TitleSuggestions implements Listener {
     String[] args = buffer.replaceFirst("^/", "").split(" ", -1);
     String command = args[0].toLowerCase(Locale.ROOT);
     if (command.startsWith("seasonaltitles:")) command = command.substring(15);
+    if ((command.equals("title") || command.equals("titles"))
+        && args.length >= 3
+        && args[1].equalsIgnoreCase("admin")) {
+      var legacy = new ArrayList<>(Arrays.asList(args));
+      legacy.remove(1);
+      legacy.set(0, "sti");
+      if ((legacy.get(1).equalsIgnoreCase("edit") || legacy.get(1).equalsIgnoreCase("preview"))
+          && legacy.size() == 3) return true;
+      return titleArgument(String.join(" ", legacy));
+    }
     if ((command.equals("title") || command.equals("titles")) && args.length == 3)
       return args[1].equalsIgnoreCase("equip") || args[1].equalsIgnoreCase("preview");
     return command.equals("sti")

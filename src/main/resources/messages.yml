@@ -1,0 +1,6 @@
+messages:
+  saved: '<green>Saved.</green>'
+  preview: '<green>Preview started for 10 seconds.</green>'
+  unequipped: '<gray>Title hidden.</gray>'
+  loading: '<yellow>SeasonalTitles is still loading.</yellow>'
+  no-permission: '<red>You do not have permission.</red>'

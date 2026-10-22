@@ -197,4 +197,32 @@ class OwnerVisibilityTest {
       assertFalse(Settings.read(config).showSelf());
     }
   }
+
+  @Test
+  void otherTitlesPreferenceCannotHideOwnPreviewOrBypassConcealment() {
+    var season = Season.parse("Winter", "2026");
+    var preferences =
+        java.util.Map.of(
+            viewer.getUniqueId(),
+            new PlayerPreferences("rainbow", false, false),
+            owner.getUniqueId(),
+            new PlayerPreferences("rainbow", false, false));
+    when(plugin.state())
+        .thenReturn(
+            new Snapshot(
+                season,
+                java.util.Map.of(),
+                java.util.Map.of(),
+                java.util.Map.of(),
+                java.util.Map.of(),
+                java.util.Set.of(),
+                java.util.Set.of(),
+                java.util.Map.of(),
+                preferences));
+    assertEquals("viewer-titles-disabled", renderer.visibilityReason(viewer, owner, false));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, false));
+    assertEquals("visible", renderer.visibilityReason(owner, owner, true));
+    when(plugin.titleHidden(owner.getUniqueId())).thenReturn(true);
+    assertEquals("hidden-by-integration", renderer.visibilityReason(owner, owner, true));
+  }
 }

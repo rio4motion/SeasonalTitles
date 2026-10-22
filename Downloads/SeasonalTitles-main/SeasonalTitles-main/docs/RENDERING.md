@@ -1,4 +1,4 @@
-# Rendering investigation — Paper 1.21.11 / SeasonalTitles 1.0.3
+# Rendering implementation — Paper 1.21.11 / SeasonalTitles 2.0
 
 ## Position, palette and suggestions (1.0.3)
 
@@ -75,3 +75,13 @@ NODE_PATH=/path/to/node_modules JAVA_HOME=/path/to/jdk21 \
 ```
 
 The script starts/stops the server, uses synthetic player `TitleOwner`, creates/clears the fixture, and writes packet evidence and a server log into the test directory. It modifies that test player's equipped selection, operator state and server test-world state. For the original 1.0.0 reproduction, use the old JAR and `--expect-hidden`; the fixture is not needed for that mode. For the 1.0.1 scoreboard reproduction, use its JAR, the current fixture and `--expect-team-hidden`. The normal 1.0.2 run includes a hidden vanilla-label team and checks title visibility plus concealment. Proxy JVM options in the script match the managed development environment and may be removed for a normal local network.
+
+## 2.0 animations and viewer variants (2026-10-22)
+
+The spawn geometry of each project copy is unchanged. Safety still uses the original one-tick task. A second shared task advances only active animated displays at the configured cadence, compares components before applying text, checks actual tracking and owner eligibility, and performs no database calls. Preferences come from immutable SQLite snapshots.
+
+Paper TextDisplay metadata is shared. Instead of sending misleading per-viewer overrides onto one entity, an animated primary has a lazy **static alternative** only while a visible viewer needs it. Both are hidden by default, append-only passengers with identical geometry. A viewer is paired with one variant after the normal concealment/LOS policy and personal title toggle. Owner self-view ignores personal *other-player* toggles. Extra static entities are removed when no longer needed; removal/hide/disconnect hooks cover both variants. This uses native Paper API and does not add ProtocolLib.
+
+The two-client test sampled 1.2–1.3 seconds at the default 10-tick cadence: static titles/static alternatives produced no repeated text metadata, the animation-enabled owner received changing frames, and the disabled viewer received none of the primary's animated text metadata. The static alternative matched the original configured component metadata exactly. Both variants passed invisibility, spectator, range/LOS and the root project's crouch checks; prefix/stats fixture survived. Restart/reconnect retained preferences, equipment and definitions, while prior awards/timestamps and active season remained intact.
+
+These are packet/API observations. Additional passenger/visibility packets and fallback entities have costs. Visual animation quality, final GUI/dropdown behavior, the production plugin stack, exact pixel placement and large-server profiling remain manual checks. No zero-lag or perfect visibility claim is made.

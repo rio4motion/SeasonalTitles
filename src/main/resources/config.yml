@@ -2,15 +2,8 @@
 initial-season:
   name: Winter
   year: 2026
-# Reloading rank mappings affects future reconciliation, never deletes awards.
-ranks:
-  speed: bronze
-  spear: silver
-  turtle: gold
-  legend: platinum
-  elf: diamond
-  dove: master
-  santa: legend
+# Tier groups and colors: tiers.yml. Custom definitions: titles.yml.
+# Effects: animations.yml. Player feedback: messages.yml.
 # MiniMessage format. Placeholders are inserted as plain text.
 format: '<color><symbol> <season> <year> • <tier></color>'
 symbols:
@@ -18,11 +11,7 @@ symbols:
   spring: '✿'
   summer: '☀'
   autumn: '❧'
-# Automatic tier palette is built in. Optional overrides (keys ignore case):
-# colors:
-#   legend: '#FF5555'
-colors: {}
-# Tier progression for suggestions follows first occurrence in ranks above.
+# Tier suggestion order follows tiers.yml.
 # Optional explicit order WITHIN a tier; unlisted titles follow by season/year.
 suggestions:
   title-order: []
@@ -56,13 +45,6 @@ reconcile:
   batch-size: 16
 permissions:
   admin: seasonaltitles.admin
-messages:
-  saved: '<green>Saved.</green>'
-  preview: '<green>Preview started for 10 seconds.</green>'
-  unequipped: '<gray>Title hidden.</gray>'
-  loading: '<yellow>SeasonalTitles is still loading.</yellow>'
-  no-permission: '<red>You do not have permission.</red>'
-
 # Temporary scoped logging of command roots only (no arguments). Reload to toggle.
 # Shows cancellation/rewrites before dispatch; helps identify external command blockers.
 diagnostics:

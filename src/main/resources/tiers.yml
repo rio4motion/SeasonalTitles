@@ -1,0 +1,15 @@
+tiers:
+  bronze:
+    groups: [bronze]
+  silver:
+    groups: [silver]
+  gold:
+    groups: [gold]
+  platinum:
+    groups: [platinum]
+  diamond:
+    groups: [diamond]
+  master:
+    groups: [master]
+  legend:
+    groups: [legend]

@@ -123,6 +123,37 @@ public final class LuckPermsBridge {
     return u == null ? Set.of() : groups(u);
   }
 
+  public List<String> groupNames() {
+    return api.getGroupManager().getLoadedGroups().stream().map(Group::getName).sorted().toList();
+  }
+
+  public void warnMappings(Settings settings) {
+    for (String name : settings.ranks().keySet())
+      api.getGroupManager()
+          .loadGroup(name)
+          .whenComplete(
+              (group, error) ->
+                  plugin.main(
+                      () -> {
+                        if (error != null)
+                          plugin
+                              .getLogger()
+                              .warning(
+                                  "Cannot validate LuckPerms group "
+                                      + name
+                                      + ": "
+                                      + error.getMessage());
+                        else if (group.isEmpty())
+                          plugin
+                              .getLogger()
+                              .warning(
+                                  "Unknown LuckPerms group '"
+                                      + name
+                                      + "' mapped in tiers.yml; awards require an effective group"
+                                      + " match.");
+                      }));
+  }
+
   public void queue(UUID id) {
     dirty.add(id);
   }

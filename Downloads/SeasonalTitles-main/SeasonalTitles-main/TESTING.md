@@ -43,3 +43,18 @@ Do not deploy as visually verified until these checks pass. Keep a database back
 Run `./gradlew build integrationFixtureJar`. The normal suite parses the real plugin.yml through Bukkit's PluginCommandYamlParser and tests root `testPermissionSilent`, alias execution, subcommand completion, preview-only access, effective LuckPerms-style cached permission data, denial, and custom administrator gate updates. `scripts/permission-regression.cjs` additionally runs two-way commands against an isolated Paper 1.21.11/LuckPerms server using one **non-OP** protocol client. It requires the same loopback-only server setup and optional test fixture as the rendering script, with a config that has no diagnostics section yet. It verifies the actual LP API sees a global default-group use node, inherited membership, no direct user override, and an effective Bukkit grant. It changes synthetic player/title state and default-group test permissions; use only a disposable server.
 
 Manual production check: with the affected non-OP user, test `/title list`, `/titles list`, both namespaced aliases, owned equip/unequip, and preview only when authorized. Confirm admin roots/subcommands are hidden/denied. Use the debug/trace instructions in README to distinguish an internal permission decision from CommandWhitelist or another external rejection. A correct result on the isolated server does not establish the production server's blocking source.
+
+## 2.0 customization and per-viewer regression
+
+Run `./gradlew build integrationFixtureJar` on Java 21. The new suite tests split-file migration and strict YAML failures, unchanged custom values/backups, legacy schema migration, definition editing and protected deletion, tier group rename/removal and historical equip after restart, multiple mappings/conflicts, independent persisted preferences, permission loss/regain/wildcards/static restrictions, styled gradients/effects/Unicode, and modern command UX. Earlier season/offline/recovery/access/visibility tests remain in the same suite.
+
+For live checks, install the optional fixture only in the loopback offline test server described above, then run:
+
+```sh
+NODE_PATH=/path/to/node_modules JAVA_HOME=/path/to/jdk21 \
+  node scripts/customization-regression.cjs /path/to/disposable-server
+```
+
+This uses two protocol clients and restarts that test server. It changes synthetic clients, definitions, mappings, permissions and world blocks. It compares static text exactly, samples animated metadata by entity/viewer, checks no recurring static text updates, verifies toggles and owner independence, previews, permission restoration, rank conflicts and persistence, and compares previous award timestamps/season across restart. Add `--crouch-visible` only when testing the uploaded copy's pre-existing crouch behavior. Both variants preserve their original geometry. Graphical assertions are not made.
+
+Before production release, use real vanilla clients to check: each effect at the chosen cadence/speed; static gradient restoration when another viewer opts out; own display with other-title settings off; long styled/Unicode titles; visibility through actual vanish/nametag integrations; sneak/pose/LOS from multiple angles; original spacing and stats; teleport/world changes/death/rejoin; and final completion ordering. Profile a realistic number of animated players, especially mixed static/animated audiences. One fallback entity per animated owner can increase entity count; two-client packet measurements do not substitute for load profiling. Java's character segmentation may split complex emoji clusters.

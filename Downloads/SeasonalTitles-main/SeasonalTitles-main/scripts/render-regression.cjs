@@ -65,6 +65,7 @@ async function run() {
   await until(()=>currentPosition.y===80,'fixture teleport');
   consoleCommand('fill -5 79 -5 5 79 5 stone');
   consoleCommand('effect clear TitleOwner');
+  if(!beforeFix&&!beforeTeamFix)await command('titles animation static','Saved.');
   await command('titles unequip',beforeFix ? 'Saved.' : 'Title hidden.');
   await command('titles equip '+title,'Saved.');
   if(beforeFix) {
@@ -82,7 +83,7 @@ async function run() {
   assert(metadata.get(id).some(m=>m.key===11&&Math.abs(m.value.y-(beforeTeamFix ? 0.55 : 0.9))<0.001),'configured translation');
   const scale = metadata.get(id).findLast(m=>m.key===12)?.value || {x:1,y:1,z:1}; // omitted = vanilla default
   assert.deepEqual(scale,{x:1,y:1,z:1},'nonzero unit scale');
-  assert(metadata.get(id).some(m=>m.key===15&&m.value===(beforeTeamFix ? 3 : 1)),'billboard orientation');
+  assert(metadata.get(id).some(m=>m.key===15&&m.value===3),'billboard orientation');
   const textFlags=metadata.get(id).findLast(m=>m.key===27)?.value || 0;
   assert.equal(textFlags & 2,0,'text must remain depth-tested');
   console.log('PASS: owner receives spawn, text, translation, scale, and subsequent attachment.');

@@ -21,7 +21,15 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
       return true;
     }
     try {
-      if (args.length == 0) throw new IllegalArgumentException(command.getUsage());
+      if (args.length == 0) {
+        if (command.getName().equals("sti")) {
+          permission(sender, plugin.settings().adminPermission());
+          help(sender, true);
+        } else if (commandAllowed(sender, "seasonaltitles.use"))
+          titles(sender, new String[] {"list"});
+        else help(sender, false);
+        return true;
+      }
       if (command.getName().equals("sti")) {
         permission(sender, plugin.settings().adminPermission());
         admin(sender, args);
@@ -51,6 +59,79 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
 
   private void titles(CommandSender sender, String[] a) {
     String sub = a[0].toLowerCase(Locale.ROOT);
+    if (sub.equals("help")) {
+      help(sender, sender.hasPermission(plugin.settings().adminPermission()));
+      return;
+    }
+    if (sub.equals("admin")) {
+      permission(sender, plugin.settings().adminPermission());
+      modernAdmin(sender, Arrays.copyOfRange(a, 1, a.length));
+      return;
+    }
+    if (List.of("animation", "animations", "on", "off").contains(sub)) {
+      permission(sender, "seasonaltitles.use");
+      Player owner = player(sender);
+      var prefs = plugin.state().preferences(owner.getUniqueId());
+      if (sub.equals("animation")) {
+        if (a.length == 1) {
+          sender.sendMessage(
+              Component.text(
+                  "Selected animation: "
+                      + prefs.animation()
+                      + ". Unlocks: "
+                      + animationOptions(owner)
+                      + ". Use /titles animation <effect>."));
+          return;
+        }
+        count(a, 2, "/titles animation <effect>");
+        String effect = a[1].toLowerCase(Locale.ROOT);
+        if (!effect.equals("default")) {
+          AnimationEffect.parse(effect);
+          if (!plugin
+              .settings()
+              .animations()
+              .allowed(
+                  owner,
+                  effect,
+                  currentDefinition(owner),
+                  plugin.state().equipped().get(owner.getUniqueId())))
+            throw new IllegalArgumentException(
+                "Animation locked or disabled. Requires seasonaltitles.animation."
+                    + effect
+                    + " and an allowed title.");
+        }
+        save(
+            sender,
+            plugin
+                .database()
+                .submit(store -> store.preference(owner.getUniqueId(), "animation", effect)));
+        return;
+      }
+      String key = sub.equals("animations") ? "animations" : "titles";
+      if (sub.equals("animations") && a.length == 1) {
+        sender.sendMessage(
+            Component.text(
+                "Other players' animations: "
+                    + (prefs.animations() ? "on" : "off")
+                    + ". Use /titles animations on|off."));
+        return;
+      }
+      if (sub.equals("animations")) count(a, 2, "/titles animations on|off");
+      else count(a, 1, "/titles on|off");
+      String value = sub.equals("animations") ? a[1].toLowerCase(Locale.ROOT) : sub;
+      if (!value.equals("on") && !value.equals("off"))
+        throw new IllegalArgumentException("Use on or off.");
+      save(
+          sender,
+          plugin.database().submit(store -> store.preference(owner.getUniqueId(), key, value)),
+          "preferences-saved",
+          "Other players' "
+              + (key.equals("titles") ? "titles" : "animations")
+              + ": "
+              + value
+              + ".");
+      return;
+    }
     if (sub.equals("update") || (sub.equals("preview") && a.length >= 3)) {
       permission(sender, plugin.settings().adminPermission());
       if (a.length < 3
@@ -104,8 +185,7 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
     if (sub.equals("reload")) {
       permission(sender, plugin.settings().adminPermission());
       count(a, 1, "/titles reload");
-      plugin.reloadSafe();
-      saved(sender);
+      save(sender, plugin.reloadSafe());
       return;
     }
     if (sub.equals("preview")) {
@@ -124,24 +204,64 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
         if (a.length > 2) throw new IllegalArgumentException("Usage: /titles list [page]");
         List<String> available =
             plugin.state().titles().values().stream()
-                .filter(t -> plugin.canEquip(p, t))
+                .sorted(TitleSuggestions.titles(plugin.settings()))
                 .map(
                     t ->
                         t.id()
+                            + (t.id().equals(plugin.state().equipped().get(p.getUniqueId()))
+                                ? " [equipped]"
+                                : "")
                             + (plugin.state().owned(p.getUniqueId()).contains(t.id())
                                 ? " [owned]"
-                                : " [access]"))
-                .sorted()
+                                : plugin.canEquip(p, t) ? " [access]" : " [locked]"))
                 .toList();
         int page = a.length == 2 ? positiveInt(a[1]) : 1;
         int pages = Math.max(1, (available.size() + 9) / 10);
         if (page > pages) throw new IllegalArgumentException("Page must be 1–" + pages);
         sender.sendMessage(
             Component.text("Titles " + page + "/" + pages + " (" + available.size() + ")"));
+        if (plugin.settings().animations() != null) {
+          var prefs = plugin.state().preferences(p.getUniqueId());
+          String effective =
+              plugin
+                  .settings()
+                  .animations()
+                  .effective(
+                      p,
+                      prefs,
+                      currentDefinition(p),
+                      plugin.state().equipped().get(p.getUniqueId()));
+          sender.sendMessage(
+              Component.text(
+                  "Animation: "
+                      + prefs.animation()
+                      + " (active "
+                      + effective
+                      + ") · Other titles: "
+                      + (prefs.titles() ? "on" : "off")
+                      + " · Other animations: "
+                      + (prefs.animations() ? "on" : "off")));
+        }
         available.stream()
             .skip((page - 1) * 10L)
             .limit(10)
-            .forEach(id -> sender.sendMessage(Component.text(id)));
+            .forEach(
+                id -> {
+                  String raw = id.split(" ", 2)[0];
+                  Title t = plugin.state().titles().get(raw);
+                  Component line = Component.text(id + " — ").append(plugin.settings().text(t));
+                  if (plugin.canEquip(p, t))
+                    line =
+                        line.clickEvent(
+                            net.kyori.adventure.text.event.ClickEvent.suggestCommand(
+                                "/titles equip " + raw));
+                  else if (commandAllowed(p, "seasonaltitles.preview"))
+                    line =
+                        line.clickEvent(
+                            net.kyori.adventure.text.event.ClickEvent.suggestCommand(
+                                "/titles preview " + raw));
+                  sender.sendMessage(line);
+                });
       }
       case "equip" -> {
         count(a, 2, "/titles equip <title-id>");
@@ -163,8 +283,109 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
       }
       default ->
           throw new IllegalArgumentException(
-              "Use /titles list, equip, unequip, preview, update or reload.");
+              "Unknown title action. Use /titles help for commands and examples.");
     }
+  }
+
+  private CustomDefinition currentDefinition(Player player) {
+    String selected = plugin.state().equipped().get(player.getUniqueId());
+    return selected == null ? null : plugin.settings().customTitles().get(selected);
+  }
+
+  private List<String> animationOptions(Player player) {
+    List<String> options = new ArrayList<>(List.of("default", "static"));
+    for (AnimationEffect effect : AnimationEffect.values())
+      if (!effect.id().equals("static")
+          && plugin
+              .settings()
+              .animations()
+              .allowed(
+                  player,
+                  effect.id(),
+                  currentDefinition(player),
+                  plugin.state().equipped().get(player.getUniqueId()))) options.add(effect.id());
+    return options;
+  }
+
+  private void help(CommandSender sender, boolean administrator) {
+    sender.sendMessage(
+        Component.text("Titles: /titles list · equip <id> · unequip · preview <id>"));
+    sender.sendMessage(
+        Component.text("Effects: /titles animation <effect> · animations on|off · on|off"));
+    if (administrator)
+      sender.sendMessage(
+          Component.text(
+              "Admin: /titles admin create|edit|delete|give|revoke|rank|season|reload. /sti legacy"
+                  + " commands remain available."));
+  }
+
+  private void modernAdmin(CommandSender sender, String[] a) {
+    if (a.length == 0 || a[0].equalsIgnoreCase("help")) {
+      help(sender, true);
+      return;
+    }
+    String sub = a[0].toLowerCase(Locale.ROOT);
+    if (sub.equals("preview")) {
+      count(a, 2, "/titles admin preview <id>");
+      Player owner = player(sender);
+      Title title = title(a[1]);
+      plugin.previews().start(owner.getUniqueId(), title.id(), plugin.tick());
+      sender.sendMessage(plugin.settings().message("preview", "Preview started for 10 seconds."));
+      return;
+    }
+    if (sub.equals("reload")) {
+      count(a, 1, "/titles admin reload");
+      save(sender, plugin.reloadSafe());
+      return;
+    }
+    if (sub.equals("season")) {
+      if (a.length == 1) {
+        sender.sendMessage(
+            Component.text(
+                "Active season: "
+                    + plugin.state().season().label()
+                    + ". /titles admin season update|preview <season> <year> [confirm]"));
+        return;
+      }
+      if (!a[1].equalsIgnoreCase("update") && !a[1].equalsIgnoreCase("preview"))
+        throw new IllegalArgumentException(
+            "Use /titles admin season update|preview <season> <year> [confirm].");
+      titles(sender, Arrays.copyOfRange(a, 1, a.length));
+      return;
+    }
+    if (sub.equals("rank")) {
+      if (a.length == 1 || (a.length == 2 && a[1].equalsIgnoreCase("list"))) {
+        sender.sendMessage(Component.text("Tier groups: " + plugin.settings().ranks()));
+        return;
+      }
+      if (a.length != 4 || !List.of("set", "add", "remove").contains(a[1].toLowerCase(Locale.ROOT)))
+        throw new IllegalArgumentException(
+            "Use /titles admin rank set|add|remove <tier> <group> or rank list.");
+      save(sender, plugin.rankMapping(Tier.parse(a[2]), a[1].toLowerCase(Locale.ROOT), a[3]));
+      return;
+    }
+    if (sub.equals("edit")) {
+      if (a.length < 2)
+        throw new IllegalArgumentException("Use /titles admin edit <id> <MiniMessage display>.");
+      Title t = custom(a[1]);
+      if (a.length == 2) {
+        sender.sendMessage(
+            Component.text(
+                "Edit titles.yml or /titles admin edit "
+                    + a[1]
+                    + " <MiniMessage display>. Animation restrictions are in titles.yml."));
+        return;
+      }
+      save(
+          sender,
+          plugin.definition(t.id(), String.join(" ", Arrays.copyOfRange(a, 2, a.length)), false));
+      return;
+    }
+    if (sub.equals("create") && a.length == 2) {
+      admin(sender, new String[] {"create", a[1], a[1].replace('_', ' ')});
+      return;
+    }
+    admin(sender, a);
   }
 
   private void admin(CommandSender sender, String[] a) {
@@ -204,7 +425,7 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
         plugin.settings().text(title); // Parse before persisting.
         if (plugin.state().titles().containsKey(title.id()))
           throw new IllegalArgumentException("Title already exists.");
-        save(sender, plugin.database().submit(s -> s.create(title)));
+        save(sender, plugin.definition(title.id(), title.customText(), false));
       }
       case "delete" -> {
         if (a.length < 2 || a.length > 3 || (a.length == 3 && !a[2].equalsIgnoreCase("confirm")))
@@ -222,20 +443,35 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                       + owners
                       + " grants and "
                       + equipped
-                      + " selections. Confirm within 30s: /sti delete "
+                      + " selections. Confirm within 30s: /titles admin delete "
                       + a[1]
                       + " confirm"));
           return;
         }
-        save(sender, plugin.database().submit(s -> s.delete(title.id(), true)));
+        save(sender, plugin.definition(title.id(), null, true));
       }
       case "give", "revoke", "enroll" -> {
         boolean enroll = a[0].equalsIgnoreCase("enroll");
-        count(
-            a,
-            enroll ? 2 : 3,
-            "/sti " + a[0] + " <player-or-uuid>" + (enroll ? "" : " <custom-id>"));
+        if (a[0].equalsIgnoreCase("revoke")) {
+          if (a.length < 3 || a.length > 4 || (a.length == 4 && !a[3].equalsIgnoreCase("confirm")))
+            throw new IllegalArgumentException("Usage: /sti revoke <player> <custom-id> [confirm]");
+        } else
+          count(
+              a,
+              enroll ? 2 : 3,
+              "/sti " + a[0] + " <player-or-uuid>" + (enroll ? "" : " <custom-id>"));
         Title title = enroll ? null : custom(a[2]);
+        if (a[0].equalsIgnoreCase("revoke")
+            && !confirmations.confirm(
+                senderKey(sender),
+                "revoke:" + a[1].toLowerCase(Locale.ROOT) + ":" + title.id(),
+                a.length == 4,
+                System.currentTimeMillis())) {
+          sender.sendMessage(
+              Component.text(
+                  "Confirm within 30s: /titles admin revoke " + a[1] + " " + a[2] + " confirm"));
+          return;
+        }
         plugin
             .ranks()
             .identify(a[1])
@@ -288,6 +524,7 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
 
   private Title title(String id) {
     Title t = plugin.state().titles().get(id);
+    if (t == null) t = plugin.state().titles().get("custom:" + id);
     if (t == null) throw new IllegalArgumentException("Unknown title ID. Use /titles list.");
     return t;
   }
@@ -313,10 +550,6 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                     sender.sendMessage(plugin.settings().message(messageKey, fallback));
                   else report(sender, e);
                 }));
-  }
-
-  private void saved(CommandSender sender) {
-    sender.sendMessage(plugin.settings().message("saved", "Saved."));
   }
 
   private void error(CommandSender sender, String message) {
@@ -345,6 +578,59 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
     boolean admin = sender.hasPermission(plugin.settings().adminPermission());
     boolean sti = command.getName().equals("sti");
     String sub = a[0].toLowerCase(Locale.ROOT);
+    if (!sti && sub.equals("admin") && a.length > 1) {
+      if (!admin) return List.of();
+      List<String> values = new ArrayList<>();
+      if (a.length == 2)
+        values.addAll(
+            List.of(
+                "create",
+                "edit",
+                "delete",
+                "give",
+                "revoke",
+                "preview",
+                "rank",
+                "season",
+                "reload",
+                "enroll",
+                "addrole",
+                "removerole",
+                "roles",
+                "custom"));
+      else if (a[1].equalsIgnoreCase("season")) {
+        if (a.length == 3) values.addAll(List.of("update", "preview"));
+        else return onTabComplete(sender, command, label, Arrays.copyOfRange(a, 2, a.length));
+      } else if (a[1].equalsIgnoreCase("rank")) {
+        if (a.length == 3) values.addAll(List.of("set", "add", "remove", "list"));
+        if (a.length == 4)
+          for (Tier tier : plugin.settings().tierOrder())
+            values.add(tier.name().toLowerCase(Locale.ROOT));
+        if (a.length == 5) values.addAll(plugin.ranks().groupNames());
+      } else if (a[1].equalsIgnoreCase("preview") && a.length == 3)
+        plugin.state().titles().keySet().forEach(values::add);
+      else if (a[1].equalsIgnoreCase("edit") && a.length == 3)
+        plugin.state().titles().values().stream()
+            .filter(t -> t.customText() != null)
+            .map(t -> t.id().substring(7))
+            .forEach(values::add);
+      else {
+        Command legacy = plugin.getCommand("sti");
+        return legacy == null
+            ? List.of()
+            : onTabComplete(sender, legacy, label, Arrays.copyOfRange(a, 1, a.length));
+      }
+      String prefix = a[a.length - 1].toLowerCase(Locale.ROOT);
+      Comparator<String> order =
+          TitleSuggestions.titleArgument(command.getName() + " " + String.join(" ", a))
+              ? TitleSuggestions.ids(plugin.settings(), plugin.state().titles())
+              : Comparator.naturalOrder();
+      return values.stream()
+          .filter(v -> v.toLowerCase(Locale.ROOT).startsWith(prefix))
+          .distinct()
+          .sorted(order)
+          .toList();
+    }
     if (sti && !admin) return List.of();
     if (a.length == 1) {
       if (sti)
@@ -361,11 +647,18 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                 "custom"));
       else {
         if (commandAllowed(sender, "seasonaltitles.use"))
-          options.addAll(List.of("list", "equip", "unequip"));
-        if (admin) options.addAll(List.of("update", "reload", "preview", "debug"));
+          options.addAll(
+              List.of("list", "equip", "unequip", "animation", "animations", "on", "off", "help"));
+        if (admin) options.addAll(List.of("admin", "update", "reload", "preview", "debug", "help"));
         if (commandAllowed(sender, "seasonaltitles.preview")) options.add("preview");
       }
     } else if (!sti) {
+      if (commandAllowed(sender, "seasonaltitles.use")
+          && sender instanceof Player p
+          && a.length == 2) {
+        if (sub.equals("animation")) options.addAll(animationOptions(p));
+        if (sub.equals("animations")) options.addAll(List.of("on", "off"));
+      }
       if (admin && sub.equals("debug") && a.length == 2)
         org.bukkit.Bukkit.getOnlinePlayers().forEach(p -> options.add(p.getName()));
       if (a.length == 2
@@ -401,7 +694,8 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
             .forEach(options::add);
       if (a.length == 2 && List.of("give", "revoke", "enroll").contains(sub))
         options.addAll(plugin.state().names().values());
-      if (a.length == 3 && sub.equals("delete")) options.add("confirm");
+      if ((a.length == 3 && sub.equals("delete")) || (a.length == 4 && sub.equals("revoke")))
+        options.add("confirm");
     }
     String prefix = a[a.length - 1].toLowerCase(Locale.ROOT);
     Comparator<String> order =

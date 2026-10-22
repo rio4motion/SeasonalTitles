@@ -9,7 +9,7 @@ commands:
     aliases: [title]
     permission: seasonaltitles.use;seasonaltitles.preview;seasonaltitles.admin
     description: Manage and preview cosmetic titles
-    usage: /titles <list|equip|unequip|preview|update|reload|debug>
+    usage: /titles [list|equip|unequip|preview|animation|animations|on|off|help|admin]
   sti:
     permission: seasonaltitles.admin
     description: SeasonalTitles administration
@@ -24,3 +24,37 @@ permissions:
   seasonaltitles.admin:
     default: op
     description: Seasonal transitions, enrollment, custom titles and role assignments
+  seasonaltitles.animation.*:
+    default: op
+    description: Access all enabled title effects
+    children:
+      seasonaltitles.animation.static: true
+      seasonaltitles.animation.rainbow: true
+      seasonaltitles.animation.gradient: true
+      seasonaltitles.animation.pulse: true
+      seasonaltitles.animation.shimmer: true
+      seasonaltitles.animation.sparkle: true
+      seasonaltitles.animation.fire: true
+      seasonaltitles.animation.glitch: true
+      seasonaltitles.animation.flicker: true
+      seasonaltitles.animation.typewriter: true
+  seasonaltitles.animation.static:
+    default: true
+  seasonaltitles.animation.rainbow:
+    default: false
+  seasonaltitles.animation.gradient:
+    default: false
+  seasonaltitles.animation.pulse:
+    default: false
+  seasonaltitles.animation.shimmer:
+    default: false
+  seasonaltitles.animation.sparkle:
+    default: false
+  seasonaltitles.animation.fire:
+    default: false
+  seasonaltitles.animation.glitch:
+    default: false
+  seasonaltitles.animation.flicker:
+    default: false
+  seasonaltitles.animation.typewriter:
+    default: false

@@ -18,6 +18,14 @@ public final class TitleRenderer {
   private final Map<UUID, TextDisplay> displays = new HashMap<>();
   private final Map<UUID, Set<UUID>> viewers = new HashMap<>();
 
+  private final Map<UUID, TextDisplay> fallbacks = new HashMap<>();
+  private final Map<UUID, Set<UUID>> fallbackViewers = new HashMap<>();
+  private final Map<UUID, Title> selectedTitles = new HashMap<>();
+  private final Map<UUID, String> effects = new HashMap<>();
+  private final Map<UUID, Long> epochs = new HashMap<>();
+  private long frame;
+  private final Set<UUID> animated = new HashSet<>();
+
   public TitleRenderer(SeasonalTitlesPlugin plugin) {
     this.plugin = plugin;
     marker = new NamespacedKey(plugin, "display");
@@ -34,7 +42,10 @@ public final class TitleRenderer {
       String selected = plugin.previews().displayed(id, tick, plugin.state().equipped().get(id));
       Title title = selected == null ? null : plugin.state().titles().get(selected);
       boolean preview = plugin.previews().active(id, tick) != null;
-      if (title == null || (!preview && !plugin.canEquip(owner, title)) || !safeOwner(owner)) {
+      if (title == null
+          || (!preview && !plugin.canEquip(owner, title))
+          || !safeOwner(owner)
+          || plugin.titleHidden(id)) {
         remove(id);
         continue;
       }
@@ -44,52 +55,142 @@ public final class TitleRenderer {
         display = null;
       }
       if (display == null) {
-        // addPassenger appends our display; do not eject or replace another plugin's passengers.
-        display =
-            owner
-                .getWorld()
-                .spawn(
-                    owner.getLocation(),
-                    TextDisplay.class,
-                    e -> {
-                      e.setVisibleByDefault(false);
-                      e.setPersistent(false);
-                      e.setInvulnerable(true);
-                      e.setGravity(false);
-                      e.getPersistentDataContainer().set(marker, PersistentDataType.BYTE, (byte) 1);
-                      e.setBillboard(Display.Billboard.CENTER);
-                      e.setSeeThrough(false);
-                      e.setShadowed(true);
-                      e.setDefaultBackground(false);
-                      e.setBackgroundColor(Color.fromARGB(0));
-                      e.setLineWidth(1000);
-                      e.setViewRange((float) (plugin.settings().distance() / 64.0));
-                      e.setInterpolationDuration(0);
-                      e.setTeleportDuration(0);
-                      e.setTransformation(
-                          new Transformation(
-                              new Vector3f(0, plugin.settings().offset(), 0),
-                              new Quaternionf(),
-                              new Vector3f(plugin.settings().scale()),
-                              new Quaternionf()));
-                      e.text(text(title));
-                    });
-        if (!owner.addPassenger(display)) {
-          display.remove();
-          continue;
-        }
+        display = create(owner, text(title));
+        if (display == null) continue;
         displays.put(id, display);
         viewers.put(id, new HashSet<>());
       }
-      Component text = text(title);
-      if (!display.text().equals(text)) display.text(text);
-      Set<UUID> shown = viewers.get(id);
+      AnimationSettings animations = plugin.settings().animations();
+      String effect =
+          animations.effective(
+              owner,
+              plugin.state().preferences(id),
+              plugin.settings().customTitles().get(title.id()),
+              title.id());
+      boolean changed =
+          !title.equals(selectedTitles.put(id, title)) || !effect.equals(effects.get(id));
+      effects.put(id, effect);
+      if (changed) {
+        epochs.put(id, frame);
+        updateText(
+            display, effect.equals("static") ? text(title) : animationFrame(title, effect, 0));
+      }
+      Set<UUID> staticAudience = new HashSet<>();
       for (Player viewer : Bukkit.getOnlinePlayers()) {
         boolean visible = visibilityReason(viewer, owner, preview).equals("visible");
-        if (visible && shown.add(viewer.getUniqueId())) viewer.showEntity(plugin, display);
-        else if (!visible && shown.remove(viewer.getUniqueId())) viewer.hideEntity(plugin, display);
+        boolean animatedView = effect.equals("static") || wantsAnimation(viewer, owner, animations);
+        show(viewer, display, viewers.get(id), visible && animatedView);
+        if (visible && !animatedView) staticAudience.add(viewer.getUniqueId());
       }
+      TextDisplay fallback = fallbacks.get(id);
+      if (fallback != null && (!fallback.isValid() || !owner.equals(fallback.getVehicle()))) {
+        removeFallback(id);
+        fallback = null;
+      }
+      if (!staticAudience.isEmpty() && fallback == null) {
+        fallback = create(owner, text(title));
+        if (fallback != null) {
+          fallbacks.put(id, fallback);
+          fallbackViewers.put(id, new HashSet<>());
+        }
+      }
+      if (fallback != null) {
+        updateText(fallback, text(title));
+        for (Player viewer : Bukkit.getOnlinePlayers())
+          show(
+              viewer,
+              fallback,
+              fallbackViewers.get(id),
+              staticAudience.contains(viewer.getUniqueId()));
+      }
+      if (staticAudience.isEmpty()) removeFallback(id);
+      if (!effect.equals("static") && !viewers.get(id).isEmpty()) animated.add(id);
+      else animated.remove(id);
     }
+  }
+
+  private boolean wantsAnimation(Player viewer, Player owner, AnimationSettings settings) {
+    return (viewer.getUniqueId().equals(owner.getUniqueId())
+            || plugin.state().preferences(viewer.getUniqueId()).animations())
+        && viewer.getLocation().distanceSquared(owner.getLocation())
+            <= settings.distance() * settings.distance();
+  }
+
+  private void show(Player viewer, TextDisplay display, Set<UUID> shown, boolean visible) {
+    if (visible && shown.add(viewer.getUniqueId())) viewer.showEntity(plugin, display);
+    else if (!visible && shown.remove(viewer.getUniqueId())) viewer.hideEntity(plugin, display);
+  }
+
+  private static void updateText(TextDisplay display, Component text) {
+    if (!display.text().equals(text)) display.text(text);
+  }
+
+  private Component animationFrame(Title title, String id, long phase) {
+    var effect = plugin.settings().animations().effects().get(id);
+    return AnimationFrames.frame(
+        text(title), AnimationEffect.parse(id), phase, effect.colors(), effect.speed());
+  }
+
+  /** One shared animation task; safety visibility remains a separate one-tick task. */
+  public void animate() {
+    frame++;
+    for (UUID id : animated) {
+      TextDisplay display = displays.get(id);
+      String effect = effects.getOrDefault(id, "static");
+      if (effect.equals("static")
+          || viewers.getOrDefault(id, Set.of()).isEmpty()
+          || display.getTrackedBy().isEmpty()) continue;
+      Player owner = Bukkit.getPlayer(id);
+      Title title = selectedTitles.get(id);
+      if (owner == null || !safeOwner(owner) || plugin.titleHidden(id) || title == null) continue;
+      if (!effect.equals(
+          plugin
+              .settings()
+              .animations()
+              .effective(
+                  owner,
+                  plugin.state().preferences(id),
+                  plugin.settings().customTitles().get(title.id()),
+                  title.id()))) continue;
+      updateText(display, animationFrame(title, effect, frame - epochs.getOrDefault(id, frame)));
+    }
+  }
+
+  private TextDisplay create(Player owner, Component text) {
+    TextDisplay display =
+        owner
+            .getWorld()
+            .spawn(
+                owner.getLocation(),
+                TextDisplay.class,
+                e -> {
+                  e.setVisibleByDefault(false);
+                  e.setPersistent(false);
+                  e.setInvulnerable(true);
+                  e.setGravity(false);
+                  e.getPersistentDataContainer().set(marker, PersistentDataType.BYTE, (byte) 1);
+                  e.setBillboard(Display.Billboard.CENTER);
+                  e.setSeeThrough(false);
+                  e.setShadowed(true);
+                  e.setDefaultBackground(false);
+                  e.setBackgroundColor(Color.fromARGB(0));
+                  e.setLineWidth(1000);
+                  e.setViewRange((float) (plugin.settings().distance() / 64.0));
+                  e.setInterpolationDuration(0);
+                  e.setTeleportDuration(0);
+                  e.setTransformation(
+                      new Transformation(
+                          new Vector3f(0, plugin.settings().offset(), 0),
+                          new Quaternionf(),
+                          new Vector3f(plugin.settings().scale()),
+                          new Quaternionf()));
+                  e.text(text);
+                });
+    if (!owner.addPassenger(display)) {
+      display.remove();
+      return null;
+    }
+    return display;
   }
 
   static boolean safeOwner(Player p) {
@@ -118,6 +219,10 @@ public final class TitleRenderer {
    */
   String visibilityReason(Player viewer, Player owner, boolean preview) {
     boolean self = viewer.getUniqueId().equals(owner.getUniqueId());
+    if (!self
+        && plugin.state() != null
+        && !plugin.state().preferences(viewer.getUniqueId()).titles())
+      return "viewer-titles-disabled";
     if (self && !plugin.settings().showSelf() && !preview) return "self-disabled";
     if (plugin.titleHidden(owner.getUniqueId())) return "hidden-by-integration";
     if (viewer.getWorld() != owner.getWorld()) return "different-world";
@@ -211,18 +316,37 @@ public final class TitleRenderer {
               + display.isSeeThrough());
     }
     if (viewer != null) {
+      lines.add(
+          "Animation: selected="
+              + plugin.state().preferences(id).animation()
+              + ", effective="
+              + effects.getOrDefault(id, "static")
+              + ", static-alternative="
+              + (fallbacks.containsKey(id) ? fallbacks.get(id).getEntityId() : "none"));
       lines.add(scoreboardDiagnostics(viewer, owner));
+      TextDisplay selectedDisplay =
+          fallbackViewers.getOrDefault(id, Set.of()).contains(viewer.getUniqueId())
+              ? fallbacks.get(id)
+              : display;
+      lines.add(
+          "Viewer preferences: titles="
+              + plugin.state().preferences(viewer.getUniqueId()).titles()
+              + ", animations="
+              + plugin.state().preferences(viewer.getUniqueId()).animations()
+              + ", variant="
+              + (selectedDisplay == display ? "primary" : "static"));
       lines.add(
           "Viewer: "
               + viewer.getName()
               + ", policy="
               + (blocked == null ? visibilityReason(viewer, owner, preview != null) : blocked)
               + ", show-requested="
-              + viewers.getOrDefault(id, Set.of()).contains(viewer.getUniqueId())
+              + (viewers.getOrDefault(id, Set.of()).contains(viewer.getUniqueId())
+                  || fallbackViewers.getOrDefault(id, Set.of()).contains(viewer.getUniqueId()))
               + ", can-see-display="
-              + (display != null && viewer.canSee(display))
+              + (selectedDisplay != null && viewer.canSee(selectedDisplay))
               + ", tracked="
-              + (display != null && display.getTrackedBy().contains(viewer)));
+              + (selectedDisplay != null && selectedDisplay.getTrackedBy().contains(viewer)));
     }
     return lines;
   }
@@ -262,14 +386,31 @@ public final class TitleRenderer {
     TextDisplay e = displays.remove(owner);
     if (e != null) e.remove();
     viewers.remove(owner);
+    removeFallback(owner);
+    selectedTitles.remove(owner);
+    effects.remove(owner);
+    epochs.remove(owner);
+    animated.remove(owner);
+  }
+
+  private void removeFallback(UUID owner) {
+    TextDisplay display = fallbacks.remove(owner);
+    if (display != null) display.remove();
+    fallbackViewers.remove(owner);
   }
 
   public void disconnect(UUID player) {
     remove(player);
     viewers.values().forEach(s -> s.remove(player));
+    fallbackViewers.values().forEach(s -> s.remove(player));
   }
 
   public void hideFor(Player viewer, UUID owner) {
+    TextDisplay fallback = fallbacks.get(owner);
+    if (fallback != null) {
+      viewer.hideEntity(plugin, fallback);
+      fallbackViewers.get(owner).remove(viewer.getUniqueId());
+    }
     TextDisplay display = displays.get(owner);
     if (display != null) {
       viewer.hideEntity(plugin, display);

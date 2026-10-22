@@ -1,154 +1,138 @@
-# SeasonalTitles
+# SeasonalTitles 2.0
 
-Permanent SeasonalFFA cosmetic collectibles for **Paper 1.21.11**, **Java 21**, and **LuckPerms 5.4+**. SQLite and its native libraries are included in the plugin JAR. No ProtocolLib is required.
+Permanent SeasonalFFA title collectibles for **Paper 1.21.11 / Java 21**, with required LuckPerms integration. Seasonal awards, role access, operator access, custom grants and previews remain separate. No rank prefixes, scoreboard teams, below-name objectives or unrelated plugin data are modified.
 
-Seasonal titles, individually granted custom titles, temporary role access, operator access, and previews are separate concepts. No rank prefixes, scoreboard teams, or below-name objectives are changed.
+## Install and upgrade
 
-**Release status:** builds and automated tests pass; a real Paper/LuckPerms console smoke test was run. Rendering has not been visually verified with Minecraft clients or SeasonalFFA's stats plugin. Complete [TESTING.md](TESTING.md) before production deployment. Titles deliberately disappear during unsupported poses rather than using unverified offsets.
+Build `./gradlew build` on Java 21, install `build/libs/SeasonalTitles-2.0.0.jar` alongside LuckPerms, and restart. No client mod, resource pack or ProtocolLib is required. Keep the existing `plugins/SeasonalTitles` folder and `titles.db`.
 
-## Installation and build
+On upgrade, missing split files are created from existing values. Legacy `ranks` and color overrides migrate to `tiers.yml`; customized messages migrate to `messages.yml`. The original config stays unchanged and receives a one-time `config.yml.pre-2.0.bak` backup. Existing split files take precedence and are not overwritten. Missing message/effect defaults are filled in memory. Invalid YAML/settings reject reload while the current settings stay active.
 
-1. Run `./gradlew clean build` with a Java 21 JDK.
-2. Install LuckPerms, then copy `build/libs/SeasonalTitles-1.0.4.jar` to `plugins/`.
-3. Before the first start, optionally place/edit `plugins/SeasonalTitles/config.yml`. The initial season defaults to **Winter 2026**.
-4. Start Paper. Back up `plugins/SeasonalTitles/` before changes; stop the server for a simple consistent SQLite backup. A live backup must include SQLite WAL state or use SQLite's backup API.
-5. Enroll existing qualifying players explicitly with `/sti enroll <player-or-uuid>`.
+SQLite migration adds a preferences table; awards, timestamps, UUIDs, equipment and active season remain intact. Existing database custom titles are exported into missing definitions in `titles.yml`. Removing a YAML definition does not silently erase ownership: use confirmed administrator deletion. Definition edits update text under the same ID and preserve grants. Keep a database backup when upgrading/downgrading schema versions.
 
-Use `/titles reload` for configuration. Bukkit `/reload` and third-party hot plugin loaders are not a supported deployment method; restart for JAR updates. Normal disable/enable closes the database, removes displays, and reloads durable state.
-
-No project license has been selected because none was supplied. Bundled SQLite JDBC is Apache-2.0; its license resources are retained in the JAR. This repository does not grant a new license to the plugin source.
-
-## Earning titles
-
-| Effective LuckPerms group | Tier |
-|---|---|
-| speed | Bronze |
-| spear | Silver |
-| turtle | Gold |
-| legend | Platinum |
-| elf | Diamond |
-| dove | Master |
-| santa | Legend |
-
-The highest effective inherited group wins, using LuckPerms query options and contexts. The primary group does not override a higher inherited rank. A stale primary-group string without effective membership does not grant eligibility. Mappings are configurable; temporary membership stops qualifying after expiry. Existing ownership never expires.
-
-Eligibility is verified **in the active server season**, never inferred for earlier seasons:
-
-- A live LuckPerms normal-data membership-add event for a rank-bearing group can enroll a new purchaser, including an offline player. The qualifying branch must contribute a mapped rank; adding an unrelated role does not enroll an existing donor.
-- A recorded rankless observation followed by an eligible observation can enroll a player on login, including after a purchase during downtime.
-- A player first observed already holding a rank requires `/sti enroll`. This includes old donors, previously unknown offline purchasers whose purchase was not observed, and unverified changes from remote servers. It is impossible to reconstruct purchase timing from current rank data alone.
-- Enrollment grants only the currently verified highest tier for the active season. Upgrades add the new tier and preserve all previous awards. Downgrades never remove awards.
-- Login, LuckPerms recalculation/mutation events, startup, seasonal transitions, and periodic known-player sweeps reconcile eligibility. Offline LuckPerms loads run asynchronously in bounded batches. Offline users use LuckPerms static contexts; world-specific eligibility can only be verified when those contexts apply.
-- No seasons skipped while the plugin was offline are backfilled. Temporary ranks that both begin and expire while unobserved cannot be reconstructed.
-
-Example: Santa verified in Spring 2027 earns `2027-spring-legend`; retaining Santa into Summer earns `2027-summer-legend`. Nothing grants Winter 2027 retroactively.
-
-Seasonal IDs are `YEAR-season-tier`, e.g. `2027-winter-legend`. Custom IDs are `custom:founder`. Every activated season has all seven catalog entries, so operators and assigned roles can access those entries without an ownership row. Arbitrary never-activated historical seasons are not fabricated.
-
-## Commands
-
-`/title` is an alias of `/titles`. IDs, not colored display text, identify titles.
-
-| Command | Purpose |
-|---|---|
-| `/titles list [page]` | Accessible titles, marked `[owned]` or `[access]`; ten per page |
-| `/titles equip <title-id>` | Select one owned or currently accessible title |
-| `/titles unequip` | Clear selection and any active preview |
-| `/title preview <title-id>` | Preview any existing catalog title for 200 ticks (10 seconds at 20 TPS) |
-| `/titles preview <season> <year>` | Read-only transition summary; enrolled count is not an award guarantee |
-| `/titles update <season> <year>` | Request transition; repeat with `confirm` within 30 seconds |
-| `/titles debug [online-player]` | Read-only administrator rendering diagnostics |
-| `/titles reload` | Validate and reload presentation, mapping, performance and permission settings |
-| `/sti enroll <player-or-uuid>` | Explicitly verify/enroll an existing donor for current and future seasons |
-| `/sti addrole <group> <tier>` | Add one exact tier to a role |
-| `/sti removerole <group> <tier>` | Remove one assignment |
-| `/sti roles` | List assignments |
-| `/sti create <id> <display text>` | Create an independent MiniMessage custom title |
-| `/sti delete <id>` | Show impact; repeat with `confirm` to delete title, grants and selections atomically |
-| `/sti give <player-or-uuid> <id>` | Grant a custom title permanently |
-| `/sti revoke <player-or-uuid> <id>` | Revoke a custom title grant |
-| `/sti custom` | List custom titles |
-
-Custom administration accepts `founder` or `custom:founder`; creation takes the bare ID. Names resolve through LuckPerms' cache without blocking Bukkit; supply a UUID if unknown. Examples:
-
-```text
-/sti addrole servermanager diamond
-/sti addrole servermanager legend
-/sti addrole servermanager bronze
-/sti create founder <gold>★ <bold>Founder</bold>
-/sti give PlayerName founder
-/titles equip custom:founder
-/title preview 2026-winter-legend
-/titles update Spring 2027
-/titles update Spring 2027 confirm
-```
-
-Role assignments stack independently: Diamond does **not** imply Gold, Silver or Bronze. Inherited role membership counts. A role never changes a LuckPerms group or grants a custom title. Removing a role or operator status immediately removes exclusive access on the next rendering check; independent ownership survives. A revoked but selected title remains stored as a dormant preference and is hidden unless another access source still applies.
-
-Operators can equip all existing titles without permanently owning them. Preview requires `seasonaltitles.preview` (default op), bypasses normal equip access, rejects overlaps, and does not write ownership or equipment. On expiration the current durable selection is rendered again, subject to current access. If the player deliberately changes equipment during a preview, the new selection takes effect afterward. Disconnect clears previews. Equipped titles and previews are now sent to their owner by default, supporting inspection in F5 without a second player. Paper cannot detect camera mode, so this also sends the entity in first person. Set `visibility.show-self: false` to opt out for normal equipment; previews still include the owner.
-
-| Permission | Default | Scope |
-|---|---|---|
-| `seasonaltitles.use` | everyone | list/equip/unequip |
-| `seasonaltitles.preview` | operators | any-title display preview |
-| `seasonaltitles.admin` | operators | updates, seasonal preview, reload, diagnostics, all `/sti` commands |
-
-The administrator permission node is configurable. Operators bypass the use and title-preview command permission checks; administrator actions still use the configured administrator permission.
-
-## Seasonal state and durability
-
-Server seasons use **Winter → Spring → Summer → Autumn** within each numbered year. Years do not depend on the real calendar. Spring 2027 may follow Winter 2026; Winter 2028 may follow Autumn 2027. Duplicate and backward transitions are rejected. Tab completion offers the other three seasons and years from the active year through ten years ahead; any valid future year through 9999 can be typed.
-
-SQLite `titles.db` is authoritative after initialization. Reloading `initial-season` cannot roll back the active season. Do not edit the database while the plugin is running.
-
-A seasonal transition atomically creates catalog entries, changes active state, records actor/time, and queues enrolled UUIDs. The durable queue resumes after a crash. Each award and queue removal commit together; uniqueness on `(uuid,title)` prevents duplicates. Rank reads tied to a superseded season cannot award a newer season. Further transitions wait until the current queue is processed. If LuckPerms is unavailable, work remains pending for retry. Rank eligibility is determined when each queued player is processed, not from a historical boundary snapshot.
-
-SQLite work runs on one worker thread with WAL, full synchronous durability, foreign keys, coalesced immutable snapshots and no-op suppression. Bukkit calls stay on the server thread. All title metadata, award timestamps, enrollment evidence, role assignments, custom grants and selections survive restart. The complete ownership index is cached in memory; very large installations should load-test memory and reconciliation costs.
-
-## Rendering and compatibility
-
-The renderer uses **one nonpersistent TextDisplay passenger per displayed player**. The Minecraft client attaches movement through its passenger graph; there is no repeating teleport loop. Translation is relative to the player's attachment point. The upright (VERTICAL) billboard keeps that offset vertical as the camera pitches. Effective height is `max(render.offset, render.nametag-top + render.gap)` (default 0.9 blocks above the anchor); old 0.55 offsets are raised automatically. Set `render.nametag-top` to the top of taller custom nametags, relative to that anchor. Bukkit cannot measure arbitrary plugin-rendered nametags. Armor does not change this offset. Text is depth-tested (`seeThrough=false`), billboarded, and hidden by default until explicitly shown to a permitted viewer. Existing scoreboard teams are read only.
-
-- Default range: 32 blocks. Viewer checks run every tick; only visibility changes send show/hide calls. Text components are cached and metadata is changed only when text changes.
-- Visibility checks include `Player.canSee`, invisibility, spectator mode, `vanished` metadata, world/range, body line of sight and a ray trace toward title height. Hide-entity events immediately hide the associated display for that viewer.
-- Titles are **suppressed while crouching, swimming/crawling, gliding, sleeping, spin attacking, riding, or otherwise nonstanding**. This is deliberate conservative behavior, not verified pose-aware positioning. Sneak/pose/potion/game-mode events remove displays early.
-- Displays are removed around teleport, death, respawn, world changes, disconnect and shutdown. Passenger recreation after teleport can briefly hide a title. Tagged stale entities are removed on world/chunk load; displays are nonpersistent.
-- Existing passengers are preserved: the title is appended without ejecting or replacing other entities. An attached stats fixture, rank prefix and below-name objective were verified to survive equip/unequip. Packet-only plugins that overwrite passenger lists still require integration.
-- Scoreboard `NAME_TAG_VISIBILITY` is **informational by default**: custom nametag plugins often hide the vanilla label to draw a replacement. It does not establish that the player is hidden. `visibility.respect-team-nametag-visibility: true` explicitly enforces those rules for other viewers only; the owner's F5 title remains eligible. Old config files default to false. `/titles debug` reports the team/rule separately from the actual title policy; Bukkit does not identify which plugin set the rule or why.
-- Packet-only vanish and packet-only scoreboard plugins may hide information without changing Bukkit state. Such integrations must call `SeasonalTitlesPlugin#setTitleHidden(uuid, true)` **on the main thread before hiding the player**, then `false` when revealed. Arbitrary packet-only visibility cannot be inferred reliably. Third-party visibility changes without events can take up to one server tick to be reflected.
-
-An invisible marker armor stand would still need viewer visibility and attachment validation, with additional hitbox/equipment concerns. Packet-only virtual passengers offer per-viewer control but require version-sensitive packet metadata and safe merging of other plugins' passenger lists. Neither is assumed to solve attachment offsets automatically. This implementation uses Paper's attachment API with conservative suppression; visual smoothness, exact spacing, own-preview behavior, portals and stats compatibility remain release gates. No zero-lag or perfect-visibility claim is made.
+The repository also contains the separately uploaded `Downloads/SeasonalTitles-main/SeasonalTitles-main` project. Both receive this update. That copy retains its prior billboard/crouching edits and 1000-completion limit. Build it to retain those edits; the repository-root renderer retains its own original safety behavior. **This upgrade does not change either copy's spacing, offset, nametag-top, gap, scale, or billboard.**
 
 ## Configuration
 
-For the positioning, suggestion-order, self-view and custom nametag fixes, complete selection-to-client trace, protocol evidence and `/titles debug`, see [rendering investigation](docs/RENDERING.md).
+| File | Purpose |
+| --- | --- |
+| `config.yml` | First-run season, seasonal format/symbols, advanced rendering, visibility, reconciliation, admin node, diagnostics |
+| `tiers.yml` | Stable tier IDs, current LuckPerms group names, tier colors and optional per-tier format |
+| `titles.yml` | Custom display definitions, default effects and restrictions |
+| `animations.yml` | Animation cadence, presets, speed/colors, enable/disable rules |
+| `messages.yml` | Common player feedback in MiniMessage |
 
-See the commented [config.yml](src/main/resources/config.yml). It includes first-run season/year, rank mappings, MiniMessage format, tier colors, seasonal symbols, attachment offset/scale/range, self-view (default enabled), optional observer-only scoreboard enforcement (default disabled), optional additional line-of-sight checking, reconciliation batch size/interval, message templates and admin permission. Critical invisibility/sneak checks and the one-tick visibility interval cannot be disabled. Formatting uses plain-text substitutions for season, year, tier and symbol. Custom display text supports MiniMessage styles and symbols, but must render as one nonempty line.
+The **active season is always SQLite state**. `initial-season` is only for an empty database; reload and rank/config migration cannot move it backward or reset it.
 
-Reload validates new settings before swapping the runtime settings and recreates displays for new offsets. Rank changes in configuration affect future reconciliation, never erase ownership or infer historical purchases.
+```yaml
+# tiers.yml — keep stable IDs; rename groups whenever the server's ranks change.
+tiers:
+  bronze:
+    groups: [speed, winter_speed]
+    color: '#CD7F32'
+  legend:
+    groups: [santa, summer_hero]
+    color: '#FF5555'
+    # Optional; otherwise uses config.yml's global format.
+    format: '<color><symbol> <season> <year> • <tier></color>'
+```
 
-## Repository status
+The seven existing stable IDs are `bronze`, `silver`, `gold`, `platinum`, `diamond`, `master`, `legend`, in their existing eligibility progression. Existing database/title IDs do not change. Removing/renaming groups or tier mappings never deletes historical seasonal definitions, awards or equipped selections. Owned seasonal titles remain equippable even when the original groups no longer exist. A tier may have zero or multiple groups. Effective inherited LuckPerms groups determine the highest tier; a stale primary-group name is not purchase evidence. A group mapped to different tiers is rejected. Unknown group names produce warnings and may be configured before the groups are created.
 
-GitHub creation was attempted for `rio4motion/SeasonalTitles`, but the connected integration returned **HTTP 403: Resource not accessible by integration** for `POST /user/repos`. Work and commits are preserved locally. After granting repository-creation access, create the repository and push this Git history. GitHub Actions is provided, but no hosted Actions run has occurred.
+Suggestion ordering follows configured tier order and optional `config.yml` → `suggestions.title-order`; remaining titles in each tier are chronological, with custom titles after ranked ones alphabetically. Paper's final suggestion event preserves this ordering after Brigadier's sorting. Client prefix filtering and access filtering remain enabled.
 
-### Colors and completion order
+```yaml
+# titles.yml
+custom-titles:
+  beta_supporter:
+    display: '<gradient:#00AAFF:#AA00FF><bold>✦ Beta Supporter</bold></gradient>'
+    default-animation: static
+    # Optional: restrict equipment even for an owner; operators bypass this node.
+    permission: seasonaltitles.custom.beta
+    # Optional: only these effects are allowed for this title. Static is always allowed.
+    allowed-animations: [shimmer, pulse]
+```
 
-Missing tier colors are automatic, case-insensitive defaults: Bronze `#CD7F32`, Silver `#C0C0C0`, Gold `#FFD700`, Platinum `#80E5E5`, Diamond `#55FFFF`, Master `#AA55FF`, Legend `#FFAA00`. Existing `colors` entries remain overrides; remove an override to use the automatic palette. No new tiers are introduced. Independent custom titles keep their MiniMessage colors and use white when uncolored. Equipped titles and previews use the same formatter.
+Custom titles support MiniMessage named/HEX colors, gradients, bold, italic, underline, strikethrough and Unicode. Seasonal placeholders are unparsed values; ordinary players cannot submit custom MiniMessage definitions. Explicit colors/templates are retained. Uncolored custom text uses white. Equipment and previews share the same formatter. Title preview permission deliberately allows viewing any existing title without ownership.
 
-Title suggestions follow each tier's first occurrence in the `ranks` YAML mapping, without changing rank eligibility or title IDs. Within each tier, optional `suggestions.title-order` lists stable IDs in the desired order; remaining titles follow by year/season. Custom titles follow ranked titles, alphabetically by ID. Historical tiers no longer mapped follow configured tiers, alphabetically. Reload rebuilds this order. Equip suggestions require use permission and access; preview permission grants suggestions for any existing title. Admin custom-title commands retain their broader scope.
+```yaml
+# animations.yml
+animations:
+  enabled: true
+  default: static
+  interval-ticks: 10
+  visibility-distance: 32
+  static-only-titles: [] # e.g. [2026-winter-legend, custom:beta_supporter]
+  effects:
+    gradient:
+      enabled: true
+      speed: 1
+      colors: ['#55FFFF', '#AA55FF']
+```
 
-Paper's final suggestion event restores this order after Brigadier sorting, preserving replacement ranges, tooltips and prefix filtering. The 1.21.11 client code preserves matching-prefix order; packet tests verify server output. The actual in-game dropdown, camera angles and full nametag plugin stack still need the release checklist. Sneaking continues to hide titles for stealth; they return on standing. Upright text can appear edge-on from directly above/below.
+Effects: `static`, `rainbow`, `gradient` (flow), `pulse`, `shimmer`, `sparkle`, `fire`, `glitch`, `flicker`, `typewriter`. Speed is >0–10; palettes accept named/HEX colors. Presets are included. Static is the default, including migrated users. A `default` player selection uses the title's default effect, or the global seasonal default, subject to permission/restrictions. Explicit `static` always stays static.
 
-### Command permission troubleshooting (1.0.4)
+## Player commands
 
-The shared `/titles` root (alias `/title`, including both `seasonaltitles:` forms) accepts **any** of `seasonaltitles.use`, `seasonaltitles.preview`, or the configured administrator node. Bukkit's semicolon-separated root permissions are OR, not AND. Basic actions still require use permission; title previews require preview permission; administrative actions and `/sti` require the configured administrator permission. Equip still checks ownership/role/operator access independently. LuckPerms inheritance and contexts are resolved through Bukkit's normal `hasPermission`; direct user nodes are not required. Reload applies a changed administrator node to both root commands and refreshes client command trees.
+`/titles` is the main entry point. `/title`, `/seasonaltitles:title` and `/seasonaltitles:titles` remain aliases.
 
-The prior 1.0.3 JAR already accepted non-OP use inherited globally from the LuckPerms default group on clean Paper 1.21.11. Its metadata had no root permission gate; it did not impose an OP-only root permission. The registration gap exposed admin roots to unauthorized clients, even though internal execution was denied; 1.0.4 fixes that visibility gap. Both aliases resolve to the same plugin command on the tested server. Vanilla `minecraft:title` remains separate and restricted. A failure of the namespaced plugin command on a production server is not explained by vanilla `/title` alone.
+| Command | Behavior |
+| --- | --- |
+| `/titles` or `/titles list [page]` | Browse owned, accessible and locked titles, equipped status, animation and viewing preferences; click an accessible entry to prepare equip |
+| `/titles equip <id>` | Equip an owned or otherwise authorized title |
+| `/titles unequip` | Clear equipment |
+| `/titles preview <id>` | Ten-second preview, then restore current equipment; no ownership/equipment writes |
+| `/titles animation [effect]` | Show unlocks/current preference, or select an unlocked effect (`default` resets to configured behavior) |
+| `/titles animations on|off` | Animate other players' titles, or show their original static formatting |
+| `/titles on` / `/titles off` | Show/hide other players' titles entirely |
+| `/titles help` | Contextual command help |
 
-As OP/console, run `/titles debug <affected-online-player>`. In addition to rendering details, it reports the affected player's effective permissions, each alias's registered owner/root permission/eligibility, and plugins listening for command preprocessing. Missing/wrong owners indicate a registration conflict. A correct owner and `root-allowed=true` rule out that root gate for this player.
+Preferences persist independently of title ownership. Losing an animation permission renders static without deleting the selection; regaining it restores the effect. One viewer's settings cannot change another viewer's display. Your own animation is unaffected by your *other-player* viewing preferences. `visibility.show-self` remains configurable; previews still include their owner. Overlapping previews are rejected and disconnect clears them.
 
-To trace a live denial, temporarily add `diagnostics: {command-trace: true}` to config (or set its existing key), run `/titles reload`, and have the affected player retry `/seasonaltitles:title list`. The console records only player/root names, cancellation, rewrite, command owner, root eligibility and effective use/preview flags. It never changes/circumvents another plugin's decision. Set it back to false afterward. `cancelled=true` means a command preprocessing listener stopped dispatch before the SeasonalTitles executor. The trace cannot identify the exact cancelling listener; the debug report lists candidates. No trace can also mean an earlier packet/proxy rejection. A listener changing the event after MONITOR observation may not be reflected.
+## Administrator commands
 
-The supplied SeasonalFFA plugin list includes **CommandWhitelist**. Check that plugin's configuration for `title`, `titles`, `seasonaltitles:title`, and `seasonaltitles:titles`. An external whitelist can deny non-OP commands despite LuckPerms granting use; its actual rules and the production denial have not been inspected. Permit the basic roots through that whitelist; SeasonalTitles continues to enforce every subcommand and title-access check.
+| Command | Behavior |
+| --- | --- |
+| `/titles admin create <id> [MiniMessage display]` | Create a definition; omitted text uses the ID as a readable label |
+| `/titles admin preview <id>` | Preview using administrator access |
+| `/titles admin edit <id> [MiniMessage display]` | Change text without losing grants; with no text, show editing guidance |
+| `/titles admin delete <id> [confirm]` | Confirmed deletion of definition and associated grants/equipment |
+| `/titles admin give <player-or-uuid> <custom-id>` | Permanent custom grant |
+| `/titles admin revoke <player-or-uuid> <custom-id> [confirm]` | Confirmed ownership revocation; other owners/definition are preserved |
+| `/titles admin rank set|add|remove <tier> <group>` | Atomically persist a tier's group mapping; set replaces its group list |
+| `/titles admin rank list` | List current mappings |
+| `/titles admin season` | Show active season |
+| `/titles admin season preview|update <season> <year> [confirm]` | Preview/confirm a forward seasonal transition |
+| `/titles admin reload` | Validate and apply config/definitions safely |
+| `/titles debug [online-player]` | Rendering and command registration/effective-permission diagnostics |
 
-This uploaded project copy retains its existing rendering edits. Permission changes are mirrored in the repository-root project; build this copy to retain its rendering behavior.
+Legacy `/sti create|delete|give|revoke|custom|addrole|removerole|roles|enroll`, `/titles update`, seasonal `/titles preview <season> <year>`, and `/titles reload` remain supported. Role tiers stack independently: `/sti addrole servermanager diamond` grants exactly Diamond access, not lower tiers. Use `/sti enroll <player-or-uuid>` for pre-install donors whose eligibility was not verified through a new purchase event. Role removal preserves independently owned titles.
+
+Custom definitions/default animations/restrictions can also be edited in `titles.yml`, then reloaded. Configuration writes use atomic replacement; definition synchronization is serialized through the database worker. If a database synchronization fails after a config write, fix the reported error and reload; existing ownership is retained.
+
+## Permissions and awards
+
+- `seasonaltitles.use` — basic management and viewing preferences; default true.
+- `seasonaltitles.preview` — title previews; default operator.
+- `seasonaltitles.admin` — administrative actions; configurable in `config.yml`.
+- `seasonaltitles.animation.<effect>` — unlock an enabled effect; non-static effects default false.
+- `seasonaltitles.animation.*` — unlock all enabled effects; default operator.
+- Static is always available. Operators can equip all existing titles without permanent grants; configured animation disable/allowlist rules still apply.
+
+The shared root accepts use **or** preview **or** configured admin permission. Subcommands retain their individual checks; `/sti` is admin-only. Bukkit resolves LuckPerms inheritance and active contexts. Root gates and client command trees refresh when the admin node is reloaded.
+
+Season names are Winter → Spring → Summer → Autumn. Years are server-controlled, independent of today's date; future-year transitions are allowed. Duplicate/backward updates are rejected and forward updates require confirmation. Seasonal awards are permanent and idempotent, keyed by UUID/season/year/tier. Verified purchases, upgrades, inherited/temporary ranks, joins, offline LP changes, restart and reconciliation remain supported. No historical seasons are inferred from a player's current rank. Offline verification uses static contexts and verifies rank when queued work is processed; unobserved past purchases cannot be reconstructed.
+
+## Rendering and performance
+
+The existing TextDisplay passenger geometry is retained, including other plugins' passenger order, rank prefix and below-name stats. Static titles use one nonpersistent display. Animated titles use that display; **one additional static display is created only while a viewer needs a different static version** (animations off or outside animation distance). Each viewer is shown only its permitted variant using Paper's native entity tracking. No mandatory packet library is needed. Removed/disconnected entities and tagged leftovers are cleaned up.
+
+One shared animation task updates active animated displays at the configured interval; unchanged frames are skipped. A 10-tick interval is two stepped updates per second at 20 TPS, not perfectly smooth animation. Per-frame work uses immutable title/preference snapshots, no database operations, and bounded component/glyph processing. Static text is not repeatedly sent. The separate safety task still checks every tick: invisibility, vanish/`canSee`, spectator, owner state, range, team opt-in and observer body/title line-of-sight. Per-viewer settings add restrictions, never bypass these checks. No per-tick teleport loop is added.
+
+Team name visibility remains informational by default because custom nametag plugins may hide the vanilla label. Optional `visibility.respect-team-nametag-visibility` applies to observers only. Packet-only vanish integrations must call `SeasonalTitlesPlugin#setTitleHidden(uuid, true)` on the server thread before concealment, then false on reveal.
+
+Two-client Paper packet checks verify original static formatting and absence of animated text metadata at an animation-disabled client, plus unchanged static text. These measurements are specific to the tested setup; passenger/visibility packets and the extra entity still have costs. Real graphical smoothness, final dropdown order, custom nametag spacing/resource packs, the full SeasonalFFA plugin stack and realistic player-count profiling remain in-game checks. Typewriter uses Java character segmentation, which may split some complex emoji sequences; surrogate/codepoint integrity is preserved. Extremely large/deep component content beyond the processing budget stays unchanged.
+
+For a production command denial, run `/titles debug <affected-player>` as OP. Temporarily enable `diagnostics.command-trace`, reload, and retry: the console logs root ownership/permission, rewrites and preprocess cancellation without command arguments. A cancellation stops the executor even when LuckPerms grants use. The supplied plugin list includes CommandWhitelist; its actual rules must be checked separately. Diagnostics do not bypass it.
+
+See [TESTING.md](TESTING.md), [docs/RENDERING.md](docs/RENDERING.md) and [PROGRESS.md](PROGRESS.md). No license was supplied; none is invented.

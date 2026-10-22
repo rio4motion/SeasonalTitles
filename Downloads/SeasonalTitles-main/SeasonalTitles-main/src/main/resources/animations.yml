@@ -1,0 +1,48 @@
+animations:
+  enabled: true
+  default: static
+  interval-ticks: 10
+  visibility-distance: 32
+  # Stable title IDs that may only use static formatting, regardless of unlocks.
+  static-only-titles: []
+  effects:
+    static:
+      enabled: true
+      speed: 1
+      colors: []
+    rainbow:
+      enabled: true
+      speed: 1
+      colors: ['#FF5555', '#FFFF55', '#55FF55', '#55FFFF', '#5555FF', '#FF55FF']
+    gradient:
+      enabled: true
+      speed: 1
+      colors: ['#55FFFF', '#AA55FF']
+    pulse:
+      enabled: true
+      speed: 1
+      colors: ['#55FFFF', '#FFFFFF']
+    shimmer:
+      enabled: true
+      speed: 1
+      colors: ['#FFFFFF', '#FFD700']
+    sparkle:
+      enabled: true
+      speed: 1
+      colors: ['#FFFFFF', '#55FFFF', '#FF55FF']
+    fire:
+      enabled: true
+      speed: 1
+      colors: ['#FF5555', '#FFAA00', '#FFFF55']
+    glitch:
+      enabled: true
+      speed: 1
+      colors: ['#FF55FF', '#55FFFF']
+    flicker:
+      enabled: true
+      speed: 1
+      colors: ['#FFFFFF', '#FFFF55']
+    typewriter:
+      enabled: true
+      speed: 1
+      colors: ['#FFFFFF']

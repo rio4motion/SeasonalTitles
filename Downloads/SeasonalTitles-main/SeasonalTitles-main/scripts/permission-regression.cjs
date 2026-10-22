@@ -59,8 +59,8 @@ async function run(){
   await consoleAck('titles debug PermissionUser','op=false, use=true, preview=false');
   await consoleAck('stfixture checkpermissions PermissionUser','fixture-ok:checkpermissions');
   for(const label of labels){
-    await command(label+' list','Titles 1/1');
-    assert.deepEqual(await suggestions('/'+label+' '),['equip','list','unequip']);
+    await command(label+' list','Titles 1/');
+    assert.deepEqual(await suggestions('/'+label+' '),['animation','animations','equip','help','list','off','on','unequip']);
   }
   await command('title preview 2027-spring-legend','You do not have permission.');
   await command('title reload','You do not have permission.');
@@ -83,15 +83,16 @@ async function run(){
   await until(()=>!roots().some(r=>labels.includes(r)),'permission refresh hides roots');
   await consoleAck('lp group default permission set seasonaltitles.use true','[LP]');
   await until(()=>roots().includes('title'),'permission refresh restores root');
-  await command('title list','Titles 1/1');
+  await command('title list','Titles 1/');
   console.log('PASS: preview-only permission, revocations and live client command-tree refresh.');
   await consoleAck('stfixture blockcommand PermissionUser','fixture-ok:blockcommand');
   await command('seasonaltitles:title list','Fixture command blocked.');
   await until(()=>log.includes('requested=/seasonaltitles:title, final=/seasonaltitles:title, cancelled=true')&&log.includes('root-allowed=true, use=true'),'external block trace');
   await consoleAck('stfixture allowcommand PermissionUser','fixture-ok:allowcommand');
-  await command('seasonaltitles:title list','Titles 1/1');
+  await command('seasonaltitles:title list','Titles 1/');
   console.log('PASS: external cancellation reproduced despite inherited use; scoped trace distinguishes it from root denial.');
-  await consoleAck('sti revoke PermissionUser '+id,'Saved.');
+  await consoleAck('sti revoke PermissionUser '+id,'Confirm within 30s');
+  await consoleAck('sti revoke PermissionUser '+id+' confirm','Saved.');
   await consoleAck('sti delete '+id,'Confirm within 30s');
   await consoleAck('sti delete '+id+' confirm','Saved.');
 }

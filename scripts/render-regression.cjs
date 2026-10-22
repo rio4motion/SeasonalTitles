@@ -65,6 +65,7 @@ async function run() {
   await until(()=>currentPosition.y===80,'fixture teleport');
   consoleCommand('fill -5 79 -5 5 79 5 stone');
   consoleCommand('effect clear TitleOwner');
+  if(!beforeFix&&!beforeTeamFix)await command('titles animation static','Saved.');
   await command('titles unequip',beforeFix ? 'Saved.' : 'Title hidden.');
   await command('titles equip '+title,'Saved.');
   if(beforeFix) {

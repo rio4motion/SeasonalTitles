@@ -46,7 +46,15 @@ public final class Store implements AutoCloseable {
       s.execute(
           "CREATE TABLE IF NOT EXISTS transitions (id INTEGER PRIMARY KEY AUTOINCREMENT, season"
               + " TEXT, year INTEGER, activated_at INTEGER, actor TEXT)");
-      s.execute("PRAGMA user_version=1");
+      try (ResultSet version = s.executeQuery("PRAGMA user_version")) {
+        if (version.next() && version.getInt(1) > 2)
+          throw new SQLException("Database is newer than this plugin; refusing to downgrade.");
+      }
+      s.execute(
+          "CREATE TABLE IF NOT EXISTS preferences (uuid TEXT PRIMARY KEY REFERENCES players(uuid),"
+              + " animation TEXT NOT NULL DEFAULT 'default', show_animations INTEGER NOT NULL"
+              + " DEFAULT 1, show_titles INTEGER NOT NULL DEFAULT 1)");
+      s.execute("PRAGMA user_version=2");
     }
     transaction(
         () -> {
@@ -214,6 +222,44 @@ public final class Store implements AutoCloseable {
     update("INSERT INTO titles(id,text) VALUES(?,?)", title.id(), title.customText());
   }
 
+  public void definitions(Collection<CustomDefinition> definitions) throws Exception {
+    transaction(
+        () -> {
+          for (CustomDefinition definition : definitions) {
+            Title title = definition.title();
+            update(
+                "INSERT INTO titles(id,text) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET"
+                    + " text=excluded.text WHERE titles.text IS NOT excluded.text AND titles.season"
+                    + " IS NULL",
+                title.id(),
+                title.customText());
+          }
+        });
+  }
+
+  public void preference(UUID player, String key, String value) throws Exception {
+    String column =
+        switch (key) {
+          case "animation" -> "animation";
+          case "animations" -> "show_animations";
+          case "titles" -> "show_titles";
+          default -> throw new IllegalArgumentException("Unknown preference");
+        };
+    if (key.equals("animation")) {
+      if (!value.equals("default")) AnimationEffect.parse(value);
+    } else if (!value.equals("on") && !value.equals("off"))
+      throw new IllegalArgumentException("Use on or off.");
+    transaction(
+        () -> {
+          remember(player, null);
+          update("INSERT OR IGNORE INTO preferences(uuid) VALUES(?)", player.toString());
+          update(
+              "UPDATE preferences SET " + column + "=? WHERE uuid=?",
+              key.equals("animation") ? value : (value.equals("on") ? 1 : 0),
+              player.toString());
+        });
+  }
+
   public void delete(String id, boolean confirmed) throws Exception {
     transaction(
         () -> {
@@ -298,7 +344,19 @@ public final class Store implements AutoCloseable {
         ResultSet r = s.executeQuery("SELECT uuid FROM pending")) {
       while (r.next()) pending.add(UUID.fromString(r.getString(1)));
     }
-    return new Snapshot(season(), titles, owned, equipped, roles, enrolled, pending, names);
+    Map<UUID, PlayerPreferences> preferences = new HashMap<>();
+    try (Statement s = db.createStatement();
+        ResultSet r = s.executeQuery("SELECT * FROM preferences")) {
+      while (r.next())
+        preferences.put(
+            UUID.fromString(r.getString("uuid")),
+            new PlayerPreferences(
+                r.getString("animation"),
+                r.getBoolean("show_animations"),
+                r.getBoolean("show_titles")));
+    }
+    return new Snapshot(
+        season(), titles, owned, equipped, roles, enrolled, pending, names, preferences);
   }
 
   public long changes() throws SQLException {
