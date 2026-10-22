@@ -53,10 +53,27 @@ public final class ConfigurationFiles {
         if (file.equals("tiers.yml") && raw.getConfigurationSection("ranks") != null)
           backupLegacyConfig(configPath);
         if (file.equals("messages.yml")) split = mergeMessages(defaults(file), split);
-        if (file.equals("animations.yml")) split = mergeRoot(defaults(file), split, "animations");
+        if (file.equals("animations.yml")) {
+          // Legacy inline settings have no split file to back up; config.yml stays untouched.
+          if (!split.contains("animations.timing-version")
+              && split.getInt("animations.interval-ticks", 1) == 10) {
+            split.set("animations.interval-ticks", 1);
+          }
+          split = mergeRoot(defaults(file), split, "animations");
+        }
         write(path, split);
       }
 
+      if (file.equals("animations.yml")
+          && !split.contains("animations.timing-version")
+          && split.getInt("animations.interval-ticks", 1) == 10) {
+        AnimationSettings.read(split); // Never rewrite an invalid animation configuration.
+        Path backup = path.resolveSibling("animations.yml.pre-2.1.bak");
+        if (!Files.exists(backup)) Files.copy(path, backup);
+        split.set("animations.interval-ticks", 1);
+        split.set("animations.timing-version", 2);
+        write(path, split);
+      }
       if (split.contains(root) && !split.isConfigurationSection(root))
         throw new IllegalArgumentException(file + ": " + root + " must be a YAML section.");
       // Message defaults are supplied in memory too, without changing an existing user's file.

@@ -1,7 +1,10 @@
 animations:
   enabled: true
   default: static
-  interval-ticks: 10
+  # One update per tick (20 Hz at 20 TPS). Higher intervals reduce work but look stepped.
+  # Speed uses elapsed server ticks, so changing the interval does not accelerate effects.
+  interval-ticks: 1
+  timing-version: 2
   visibility-distance: 32
   # Stable title IDs that may only use static formatting, regardless of unlocks.
   static-only-titles: []
@@ -34,14 +37,17 @@ animations:
       enabled: true
       speed: 1
       colors: ['#FF5555', '#FFAA00', '#FFFF55']
+    # Legacy ID: a readable neon scan, without character corruption.
     glitch:
       enabled: true
       speed: 1
       colors: ['#FF55FF', '#55FFFF']
+    # Gentle candle glow, without abrupt dark flashes.
     flicker:
       enabled: true
       speed: 1
       colors: ['#FFFFFF', '#FFFF55']
+    # Reveal, then hold the complete title before the next cycle.
     typewriter:
       enabled: true
       speed: 1

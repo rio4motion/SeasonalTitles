@@ -19,6 +19,7 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
   private LuckPermsBridge ranks;
   private TitleRenderer renderer;
   private ConfigurationFiles files;
+  private AnimationVouchers vouchers;
   private org.bukkit.scheduler.BukkitTask animationTask;
   private final Preview previews = new Preview();
   private final Set<UUID> hiddenTitles = new HashSet<>();
@@ -49,6 +50,7 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
     }
     ranks = new LuckPermsBridge(this, registration.getProvider());
     database = new Database(s -> main(() -> state = s));
+    vouchers = new AnimationVouchers(this);
     var commands = new TitleCommands(this);
     for (String name : List.of("titles", "sti")) {
       var command = Objects.requireNonNull(getCommand(name));
@@ -59,6 +61,7 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
     getServer().getPluginManager().registerEvents(new CommandPermissions(this), this);
     getServer().getPluginManager().registerEvents(this, this);
     getServer().getPluginManager().registerEvents(new TitleSuggestions(this), this);
+    getServer().getPluginManager().registerEvents(vouchers, this);
     database
         .open(getDataFolder().toPath().resolve("titles.db"), settings.initial())
         .whenComplete(
@@ -88,7 +91,11 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
                                           restartAnimations();
                                           ranks.warnMappings(imported);
                                           Bukkit.getOnlinePlayers()
-                                              .forEach(p -> ranks.queue(p.getUniqueId()));
+                                              .forEach(
+                                                  p -> {
+                                                    ranks.queue(p.getUniqueId());
+                                                    vouchers.claim(p.getUniqueId(), false);
+                                                  });
                                           getLogger().info("Ready: " + state.season().label());
                                         }));
                       } catch (Exception problem) {
@@ -159,6 +166,10 @@ public final class SeasonalTitlesPlugin extends JavaPlugin implements Listener {
 
   public Database database() {
     return database;
+  }
+
+  public AnimationVouchers vouchers() {
+    return vouchers;
   }
 
   public LuckPermsBridge ranks() {

@@ -17,6 +17,7 @@ import org.bukkit.scoreboard.DisplaySlot;
 public final class RenderingFixture extends JavaPlugin implements org.bukkit.event.Listener {
   private final Map<UUID, ArmorStand> stands = new HashMap<>();
   private final java.util.Set<UUID> blocked = new java.util.HashSet<>();
+  private final Map<UUID, org.bukkit.inventory.ItemStack> vouchers = new HashMap<>();
 
   @Override
   public void onEnable() {
@@ -52,6 +53,62 @@ public final class RenderingFixture extends JavaPlugin implements org.bukkit.eve
     SeasonalTitlesPlugin titles =
         (SeasonalTitlesPlugin) Bukkit.getPluginManager().getPlugin("SeasonalTitles");
     switch (args[0]) {
+      case "checkvoucherburst" -> {
+        var key = new org.bukkit.NamespacedKey(titles, "animation_voucher");
+        long count =
+            java.util.Arrays.stream(player.getInventory().getStorageContents())
+                .filter(item -> item != null && item.getPersistentDataContainer().has(key))
+                .count();
+        if (count != 3)
+          throw new IllegalStateException("Expected three physical vouchers, got " + count);
+      }
+      case "voucherhand" -> {
+        var inventory = player.getInventory();
+        var key = new org.bukkit.NamespacedKey(titles, "animation_voucher");
+        int slot = -1;
+        for (int i = 0; i < inventory.getStorageContents().length; i++) {
+          var item = inventory.getItem(i);
+          if (item != null && item.getPersistentDataContainer().has(key)) {
+            slot = i;
+            break;
+          }
+        }
+        if (slot < 0) throw new IllegalStateException("No voucher found");
+        var item = inventory.getItem(slot);
+        inventory.setItem(slot, inventory.getItem(0));
+        inventory.setItem(0, item);
+        inventory.setHeldItemSlot(0);
+        vouchers.put(player.getUniqueId(), item.clone());
+      }
+      case "vouchercopy" ->
+          player.getInventory().setItemInMainHand(vouchers.get(player.getUniqueId()).clone());
+      case "vouchertrade" -> {
+        var recipient = java.util.Objects.requireNonNull(Bukkit.getPlayerExact("TitleObserver"));
+        var item = player.getInventory().getItemInMainHand().clone();
+        player.getInventory().setItemInMainHand(null);
+        recipient.getInventory().setHeldItemSlot(0);
+        recipient.getInventory().setItem(0, item);
+        vouchers.put(recipient.getUniqueId(), item.clone());
+      }
+      case "voucherfake" -> {
+        var item = vouchers.get(player.getUniqueId()).clone();
+        item.editMeta(
+            meta ->
+                meta.getPersistentDataContainer()
+                    .set(
+                        new org.bukkit.NamespacedKey(titles, "voucher_effect"),
+                        org.bukkit.persistence.PersistentDataType.STRING,
+                        "gradient"));
+        player.getInventory().setItemInMainHand(item);
+      }
+      case "voucherfull" -> {
+        player.getInventory().clear();
+        for (int i = 0; i < player.getInventory().getStorageContents().length; i++)
+          player
+              .getInventory()
+              .setItem(i, new org.bukkit.inventory.ItemStack(org.bukkit.Material.STONE, 64));
+      }
+      case "emptyinventory" -> player.getInventory().clear();
       case "checkpreview" -> {
         var result = titles.getCommand("titles").tabComplete(player, "title", new String[] {""});
         if (!result.equals(java.util.List.of("preview")))

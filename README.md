@@ -1,14 +1,14 @@
-# SeasonalTitles 2.0
+# SeasonalTitles 2.1
 
 Permanent SeasonalFFA title collectibles for **Paper 1.21.11 / Java 21**, with required LuckPerms integration. Seasonal awards, role access, operator access, custom grants and previews remain separate. No rank prefixes, scoreboard teams, below-name objectives or unrelated plugin data are modified.
 
 ## Install and upgrade
 
-Build `./gradlew build` on Java 21, install `build/libs/SeasonalTitles-2.0.0.jar` alongside LuckPerms, and restart. No client mod, resource pack or ProtocolLib is required. Keep the existing `plugins/SeasonalTitles` folder and `titles.db`.
+Build `./gradlew build` on Java 21, install `build/libs/SeasonalTitles-2.1.0.jar` alongside LuckPerms, and restart. No client mod, resource pack or ProtocolLib is required. Keep the existing `plugins/SeasonalTitles` folder and `titles.db`.
 
-On upgrade, missing split files are created from existing values. Legacy `ranks` and color overrides migrate to `tiers.yml`; customized messages migrate to `messages.yml`. The original config stays unchanged and receives a one-time `config.yml.pre-2.0.bak` backup. Existing split files take precedence and are not overwritten. Missing message/effect defaults are filled in memory. Invalid YAML/settings reject reload while the current settings stay active.
+On upgrade, missing split files are created from existing values. Legacy `ranks` and color overrides migrate to `tiers.yml`; customized messages migrate to `messages.yml`. The original config stays unchanged and receives a one-time `config.yml.pre-2.0.bak` backup. Existing split files take precedence. The old 10-tick animation default migrates once to 1 tick, with `animations.yml.pre-2.1.bak`; custom speeds, palettes and other values are retained. Other intervals and later administrator changes are respected. Missing message/effect defaults are filled in memory. Invalid YAML/settings reject reload while the current settings stay active.
 
-SQLite migration adds a preferences table; awards, timestamps, UUIDs, equipment and active season remain intact. Existing database custom titles are exported into missing definitions in `titles.yml`. Removing a YAML definition does not silently erase ownership: use confirmed administrator deletion. Definition edits update text under the same ID and preserve grants. Keep a database backup when upgrading/downgrading schema versions.
+SQLite schema 3 adds permanent animation unlocks and single-use voucher records alongside preferences; awards, timestamps, UUIDs, equipment and active season remain intact. Existing database custom titles are exported into missing definitions in `titles.yml`. Removing a YAML definition does not silently erase ownership: use confirmed administrator deletion. Definition edits update text under the same ID and preserve grants. Keep a database backup when upgrading/downgrading schema versions.
 
 The repository also contains the separately uploaded `Downloads/SeasonalTitles-main/SeasonalTitles-main` project. Both receive this update. That copy retains its prior billboard/crouching edits and 1000-completion limit. Build it to retain those edits; the repository-root renderer retains its own original safety behavior. **This upgrade does not change either copy's spacing, offset, nametag-top, gap, scale, or billboard.**
 
@@ -60,7 +60,8 @@ Custom titles support MiniMessage named/HEX colors, gradients, bold, italic, und
 animations:
   enabled: true
   default: static
-  interval-ticks: 10
+  interval-ticks: 1
+  timing-version: 2 # prevents repeating the legacy 10 → 1 migration
   visibility-distance: 32
   static-only-titles: [] # e.g. [2026-winter-legend, custom:beta_supporter]
   effects:
@@ -70,7 +71,7 @@ animations:
       colors: ['#55FFFF', '#AA55FF']
 ```
 
-Effects: `static`, `rainbow`, `gradient` (flow), `pulse`, `shimmer`, `sparkle`, `fire`, `glitch`, `flicker`, `typewriter`. Speed is >0–10; palettes accept named/HEX colors. Presets are included. Static is the default, including migrated users. A `default` player selection uses the title's default effect, or the global seasonal default, subject to permission/restrictions. Explicit `static` always stays static.
+Effects: `static`, `rainbow`, `gradient` (smooth left-to-right flow), `pulse`, `shimmer`, `sparkle`, `fire`, `glitch`, `flicker`, `typewriter`. Speed is >0–10 and uses elapsed server ticks (speed 1 is a six-second cycle), independent of update cadence; palettes accept named/HEX colors. Fire uses continuous warm color waves, pulse breathes gently, shimmer/sparkle brighten without harsh jumps, legacy glitch is a readable neon scan without character corruption, flicker is a gentle glow, and typewriter reveals then holds the full title. Presets are included. Static is the default, including migrated users. A `default` player selection uses the title's default effect, or the global seasonal default, subject to permission/restrictions. Explicit `static` always stays static.
 
 ## Player commands
 
@@ -78,16 +79,17 @@ Effects: `static`, `rainbow`, `gradient` (flow), `pulse`, `shimmer`, `sparkle`, 
 
 | Command | Behavior |
 | --- | --- |
-| `/titles` or `/titles list [page]` | Browse owned, accessible and locked titles, equipped status, animation and viewing preferences; click an accessible entry to prepare equip |
+| `/titles` or `/titles list [page]` | Browse formatted titles with owned/not-owned, available/locked and equipped status. Internal IDs are hidden from labels; click an entry to prepare equip or preview |
 | `/titles equip <id>` | Equip an owned or otherwise authorized title |
 | `/titles unequip` | Clear equipment |
 | `/titles preview <id>` | Ten-second preview, then restore current equipment; no ownership/equipment writes |
 | `/titles animation [effect]` | Show unlocks/current preference, or select an unlocked effect (`default` resets to configured behavior) |
-| `/titles animations on|off` | Animate other players' titles, or show their original static formatting |
+| `/titles animations on\|off` | Animate other players' titles, or show their original static formatting |
 | `/titles on` / `/titles off` | Show/hide other players' titles entirely |
+| `/titles vouchers` | Collect pending voucher deliveries after freeing inventory space |
 | `/titles help` | Contextual command help |
 
-Preferences persist independently of title ownership. Losing an animation permission renders static without deleting the selection; regaining it restores the effect. One viewer's settings cannot change another viewer's display. Your own animation is unaffected by your *other-player* viewing preferences. `visibility.show-self` remains configurable; previews still include their owner. Overlapping previews are rejected and disconnect clears them.
+Preferences persist independently of title ownership. Without a permanent voucher unlock, losing an animation permission renders static without deleting the selection; regaining it restores the effect. One viewer's settings cannot change another viewer's display. Your own animation is unaffected by your *other-player* viewing preferences. `visibility.show-self` remains configurable; previews still include their owner. Overlapping previews are rejected and disconnect clears them.
 
 ## Administrator commands
 
@@ -99,16 +101,25 @@ Preferences persist independently of title ownership. Losing an animation permis
 | `/titles admin delete <id> [confirm]` | Confirmed deletion of definition and associated grants/equipment |
 | `/titles admin give <player-or-uuid> <custom-id>` | Permanent custom grant |
 | `/titles admin revoke <player-or-uuid> <custom-id> [confirm]` | Confirmed ownership revocation; other owners/definition are preserved |
-| `/titles admin rank set|add|remove <tier> <group>` | Atomically persist a tier's group mapping; set replaces its group list |
+| `/titles admin voucher <effect> [online-player]` | Issue one tradable animation voucher; omit player to give it to yourself |
+| `/titles admin rank set\|add\|remove <tier> <group>` | Atomically persist a tier's group mapping; set replaces its group list |
 | `/titles admin rank list` | List current mappings |
 | `/titles admin season` | Show active season |
-| `/titles admin season preview|update <season> <year> [confirm]` | Preview/confirm a forward seasonal transition |
+| `/titles admin season preview\|update <season> <year> [confirm]` | Preview/confirm a forward seasonal transition |
 | `/titles admin reload` | Validate and apply config/definitions safely |
 | `/titles debug [online-player]` | Rendering and command registration/effective-permission diagnostics |
 
-Legacy `/sti create|delete|give|revoke|custom|addrole|removerole|roles|enroll`, `/titles update`, seasonal `/titles preview <season> <year>`, and `/titles reload` remain supported. Role tiers stack independently: `/sti addrole servermanager diamond` grants exactly Diamond access, not lower tiers. Use `/sti enroll <player-or-uuid>` for pre-install donors whose eligibility was not verified through a new purchase event. Role removal preserves independently owned titles.
+Legacy `/sti create|delete|give|revoke|custom|addrole|removerole|roles|enroll|voucher`, `/titles update`, seasonal `/titles preview <season> <year>`, and `/titles reload` remain supported. Role tiers stack independently: `/sti addrole servermanager diamond` grants exactly Diamond access, not lower tiers. Use `/sti enroll <player-or-uuid>` for pre-install donors whose eligibility was not verified through a new purchase event. Role removal preserves independently owned titles.
 
 Custom definitions/default animations/restrictions can also be edited in `titles.yml`, then reloaded. Configuration writes use atomic replacement; definition synchronization is serialized through the database worker. If a database synchronization fails after a config write, fix the reported error and reload; existing ownership is retained.
+
+## Physical animation vouchers
+
+Give yourself a voucher with `/titles admin voucher rainbow`, `/titles admin voucher fire` or `/titles admin voucher gradient`. Add an online player's name to deliver directly. Each command creates one unique paper voucher; trade it normally, hold it in the main hand and right-click to permanently unlock that effect. Then select it with `/titles animation <effect>`. Unlocks are independent of title ownership and do not change LuckPerms groups or permissions.
+
+Static is already free, so it has no voucher. Redemption does not automatically change the selected animation. A permanent unlock remains available when ranks/permissions change, including an LP denial: it is a separate entitlement. Global effect switches, per-title allowlists and static-only restrictions still apply. A player who already permanently unlocked an effect keeps the unspent voucher to trade. Disabled effects cannot be newly issued; existing vouchers keep their entitlement if redeemed while disabled, but the effect remains unusable until enabled.
+
+Tokens and their effects are registered in SQLite. Renaming paper cannot make a valid voucher, changing its effect invalidates it, and copying an issued item cannot redeem the token twice. Unlock and spent-token status commit in one transaction **before** the item is consumed. Moving/dropping/disconnecting during that short operation can leave a spent physical copy, which grants nothing further. Failed redemption keeps the item. Full-inventory deliveries remain pending for `/titles vouchers` or the next login; pending deliveries and unlocks survive restart. As with other Minecraft item systems, player-inventory saving and SQLite are not one atomic transaction across a hard process crash; a recovered delivery may repeat the same token, never mint a second entitlement. Back up the database and world/player inventories together.
 
 ## Permissions and awards
 
@@ -127,7 +138,7 @@ Season names are Winter → Spring → Summer → Autumn. Years are server-contr
 
 The existing TextDisplay passenger geometry is retained, including other plugins' passenger order, rank prefix and below-name stats. Static titles use one nonpersistent display. Animated titles use that display; **one additional static display is created only while a viewer needs a different static version** (animations off or outside animation distance). Each viewer is shown only its permitted variant using Paper's native entity tracking. No mandatory packet library is needed. Removed/disconnected entities and tagged leftovers are cleaned up.
 
-One shared animation task updates active animated displays at the configured interval; unchanged frames are skipped. A 10-tick interval is two stepped updates per second at 20 TPS, not perfectly smooth animation. Per-frame work uses immutable title/preference snapshots, no database operations, and bounded component/glyph processing. Static text is not repeatedly sent. The separate safety task still checks every tick: invisibility, vanish/`canSee`, spectator, owner state, range, team opt-in and observer body/title line-of-sight. Per-viewer settings add restrictions, never bypass these checks. No per-tick teleport loop is added.
+One shared animation task updates active animated displays at the configured interval; unchanged frames are skipped. The default 1-tick interval samples at up to 20 updates per second at 20 TPS. Raising it to 10 samples twice per second and looks stepped; elapsed-time speed is unchanged. One-tick animation can increase CPU and metadata traffic, so profile your player count. Per-frame work uses immutable title/preference snapshots, no database operations, and bounded component/glyph processing. Static text is not repeatedly sent. The separate safety task still checks every tick: invisibility, vanish/`canSee`, spectator, owner state, range, team opt-in and observer body/title line-of-sight. Per-viewer settings add restrictions, never bypass these checks. No per-tick teleport loop is added.
 
 Team name visibility remains informational by default because custom nametag plugins may hide the vanilla label. Optional `visibility.respect-team-nametag-visibility` applies to observers only. Packet-only vanish integrations must call `SeasonalTitlesPlugin#setTitleHidden(uuid, true)` on the server thread before concealment, then false on reveal.
 

@@ -94,9 +94,10 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                   owner,
                   effect,
                   currentDefinition(owner),
-                  plugin.state().equipped().get(owner.getUniqueId())))
+                  plugin.state().equipped().get(owner.getUniqueId()),
+                  plugin.state().animationUnlocks(owner.getUniqueId())))
             throw new IllegalArgumentException(
-                "Animation locked or disabled. Requires seasonaltitles.animation."
+                "Animation locked or disabled. Unlock with a voucher or seasonaltitles.animation."
                     + effect
                     + " and an allowed title.");
         }
@@ -202,18 +203,9 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
     switch (sub) {
       case "list" -> {
         if (a.length > 2) throw new IllegalArgumentException("Usage: /titles list [page]");
-        List<String> available =
+        List<Title> available =
             plugin.state().titles().values().stream()
                 .sorted(TitleSuggestions.titles(plugin.settings()))
-                .map(
-                    t ->
-                        t.id()
-                            + (t.id().equals(plugin.state().equipped().get(p.getUniqueId()))
-                                ? " [equipped]"
-                                : "")
-                            + (plugin.state().owned(p.getUniqueId()).contains(t.id())
-                                ? " [owned]"
-                                : plugin.canEquip(p, t) ? " [access]" : " [locked]"))
                 .toList();
         int page = a.length == 2 ? positiveInt(a[1]) : 1;
         int pages = Math.max(1, (available.size() + 9) / 10);
@@ -230,7 +222,8 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                       p,
                       prefs,
                       currentDefinition(p),
-                      plugin.state().equipped().get(p.getUniqueId()));
+                      plugin.state().equipped().get(p.getUniqueId()),
+                      plugin.state().animationUnlocks(p.getUniqueId()));
           sender.sendMessage(
               Component.text(
                   "Animation: "
@@ -246,22 +239,19 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
             .skip((page - 1) * 10L)
             .limit(10)
             .forEach(
-                id -> {
-                  String raw = id.split(" ", 2)[0];
-                  Title t = plugin.state().titles().get(raw);
-                  Component line = Component.text(id + " — ").append(plugin.settings().text(t));
-                  if (plugin.canEquip(p, t))
-                    line =
-                        line.clickEvent(
-                            net.kyori.adventure.text.event.ClickEvent.suggestCommand(
-                                "/titles equip " + raw));
-                  else if (commandAllowed(p, "seasonaltitles.preview"))
-                    line =
-                        line.clickEvent(
-                            net.kyori.adventure.text.event.ClickEvent.suggestCommand(
-                                "/titles preview " + raw));
-                  sender.sendMessage(line);
-                });
+                t ->
+                    sender.sendMessage(
+                        TitleBrowser.line(
+                            plugin.settings(),
+                            t,
+                            plugin.state().owned(p.getUniqueId()).contains(t.id()),
+                            plugin.canEquip(p, t),
+                            t.id().equals(plugin.state().equipped().get(p.getUniqueId())),
+                            commandAllowed(p, "seasonaltitles.preview"))));
+      }
+      case "vouchers" -> {
+        count(a, 1, "/titles vouchers");
+        plugin.vouchers().claim(p.getUniqueId(), true);
       }
       case "equip" -> {
         count(a, 2, "/titles equip <title-id>");
@@ -303,7 +293,8 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                   player,
                   effect.id(),
                   currentDefinition(player),
-                  plugin.state().equipped().get(player.getUniqueId()))) options.add(effect.id());
+                  plugin.state().equipped().get(player.getUniqueId()),
+                  plugin.state().animationUnlocks(player.getUniqueId()))) options.add(effect.id());
     return options;
   }
 
@@ -311,12 +302,13 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
     sender.sendMessage(
         Component.text("Titles: /titles list · equip <id> · unequip · preview <id>"));
     sender.sendMessage(
-        Component.text("Effects: /titles animation <effect> · animations on|off · on|off"));
+        Component.text(
+            "Effects: /titles animation <effect> · animations on|off · on|off · vouchers"));
     if (administrator)
       sender.sendMessage(
           Component.text(
-              "Admin: /titles admin create|edit|delete|give|revoke|rank|season|reload. /sti legacy"
-                  + " commands remain available."));
+              "Admin: /titles admin create|edit|delete|give|revoke|voucher|rank|season|reload. /sti"
+                  + " legacy commands remain available."));
   }
 
   private void modernAdmin(CommandSender sender, String[] a) {
@@ -390,6 +382,18 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
 
   private void admin(CommandSender sender, String[] a) {
     switch (a[0].toLowerCase(Locale.ROOT)) {
+      case "voucher" -> {
+        if (a.length < 2 || a.length > 3)
+          throw new IllegalArgumentException(
+              "Usage: /titles admin voucher <effect> [online-player]");
+        Player target = a.length == 2 ? player(sender) : org.bukkit.Bukkit.getPlayerExact(a[2]);
+        if (target == null) throw new IllegalArgumentException("Player must be online.");
+        save(
+            sender,
+            plugin.vouchers().issue(target, a[1]),
+            "voucher-issued",
+            "Voucher created for " + target.getName() + ".");
+      }
       case "addrole", "removerole" -> {
         count(a, 3, "/sti " + a[0] + " <group> <tier>");
         Tier tier = Tier.parse(a[2]);
@@ -597,7 +601,8 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                 "addrole",
                 "removerole",
                 "roles",
-                "custom"));
+                "custom",
+                "voucher"));
       else if (a[1].equalsIgnoreCase("season")) {
         if (a.length == 3) values.addAll(List.of("update", "preview"));
         else return onTabComplete(sender, command, label, Arrays.copyOfRange(a, 2, a.length));
@@ -644,11 +649,21 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
                 "delete",
                 "give",
                 "revoke",
-                "custom"));
+                "custom",
+                "voucher"));
       else {
         if (commandAllowed(sender, "seasonaltitles.use"))
           options.addAll(
-              List.of("list", "equip", "unequip", "animation", "animations", "on", "off", "help"));
+              List.of(
+                  "list",
+                  "equip",
+                  "unequip",
+                  "animation",
+                  "animations",
+                  "on",
+                  "off",
+                  "vouchers",
+                  "help"));
         if (admin) options.addAll(List.of("admin", "update", "reload", "preview", "debug", "help"));
         if (commandAllowed(sender, "seasonaltitles.preview")) options.add("preview");
       }
@@ -682,6 +697,19 @@ public final class TitleCommands implements CommandExecutor, TabCompleter {
         if (a.length == 4 && sub.equals("update")) options.add("confirm");
       }
     } else {
+      if (a.length == 2 && sub.equals("voucher"))
+        plugin
+            .settings()
+            .animations()
+            .effects()
+            .forEach(
+                (id, effect) -> {
+                  if (!id.equals("static")
+                      && effect.enabled()
+                      && plugin.settings().animations().enabled()) options.add(id);
+                });
+      if (a.length == 3 && sub.equals("voucher"))
+        org.bukkit.Bukkit.getOnlinePlayers().forEach(p -> options.add(p.getName()));
       if (a.length == 3 && (sub.equals("addrole") || sub.equals("removerole")))
         for (Tier tier : Tier.values()) options.add(tier.name().toLowerCase(Locale.ROOT));
       if (a.length == 2 && sub.equals("removerole"))

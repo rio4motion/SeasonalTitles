@@ -1,4 +1,4 @@
-# Rendering implementation — Paper 1.21.11 / SeasonalTitles 2.0
+# Rendering implementation — Paper 1.21.11 / SeasonalTitles 2.1
 
 ## Position, palette and suggestions (1.0.3)
 
@@ -85,3 +85,8 @@ Paper TextDisplay metadata is shared. Instead of sending misleading per-viewer o
 The two-client test sampled 1.2–1.3 seconds at the default 10-tick cadence: static titles/static alternatives produced no repeated text metadata, the animation-enabled owner received changing frames, and the disabled viewer received none of the primary's animated text metadata. The static alternative matched the original configured component metadata exactly. Both variants passed invisibility, spectator, range/LOS and the root project's crouch checks; prefix/stats fixture survived. Restart/reconnect retained preferences, equipment and definitions, while prior awards/timestamps and active season remained intact.
 
 These are packet/API observations. Additional passenger/visibility packets and fallback entities have costs. Visual animation quality, final GUI/dropdown behavior, the production plugin stack, exact pixel placement and large-server profiling remain manual checks. No zero-lag or perfect visibility claim is made.
+
+
+## 2.1 animation sampling
+
+The default interval is now one tick. Effects advance using elapsed server ticks instead of scheduler invocation count, keeping speed stable when cadence changes. Gradient features travel left to right and cycle through eased palette blends without a seam. Fire, sparkle, flicker and neon scan use continuous waves rather than per-frame random noise. Typewriter holds the full title after revealing it. The title-wide styled/Unicode component traversal, work bounds, static skip behavior, two viewer variants, original geometry and safety checks are retained. Physical voucher unlocks are read from immutable snapshots and never query SQLite during a rendering frame.

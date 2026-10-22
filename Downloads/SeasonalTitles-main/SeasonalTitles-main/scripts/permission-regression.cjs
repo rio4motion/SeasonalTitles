@@ -60,7 +60,7 @@ async function run(){
   await consoleAck('stfixture checkpermissions PermissionUser','fixture-ok:checkpermissions');
   for(const label of labels){
     await command(label+' list','Titles 1/');
-    assert.deepEqual(await suggestions('/'+label+' '),['animation','animations','equip','help','list','off','on','unequip']);
+    assert.deepEqual(await suggestions('/'+label+' '),['animation','animations','equip','help','list','off','on','unequip','vouchers']);
   }
   await command('title preview 2027-spring-legend','You do not have permission.');
   await command('title reload','You do not have permission.');

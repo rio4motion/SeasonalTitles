@@ -61,6 +61,53 @@ class ConfigurationFilesTest {
   }
 
   @Test
+  void migratesOldTenTickCadenceOnceWithBackupAndPreservesCustomValues() throws Exception {
+    Files.writeString(folder.resolve("config.yml"), "initial-season: {name: Winter, year: 2026}\n");
+    var files = new ConfigurationFiles(folder);
+    files.load();
+    Path path = folder.resolve("animations.yml");
+    String old =
+        "animations:\n"
+            + "  interval-ticks: 10\n"
+            + "  effects:\n"
+            + "    gradient:\n"
+            + "      speed: 0.7\n"
+            + "      colors: ['#123456', '#ABCDEF']\n";
+    Files.writeString(path, old);
+    var migrated = files.load();
+    assertEquals(1, migrated.getInt("animations.interval-ticks"));
+    assertEquals(0.7, migrated.getDouble("animations.effects.gradient.speed"));
+    assertEquals(
+        java.util.List.of("#123456", "#ABCDEF"),
+        migrated.getStringList("animations.effects.gradient.colors"));
+    assertEquals(old, Files.readString(folder.resolve("animations.yml.pre-2.1.bak")));
+    var edited = ConfigurationFiles.read(path);
+    edited.set("animations.interval-ticks", 10);
+    ConfigurationFiles.write(path, edited);
+    assertEquals(
+        10,
+        files.load().getInt("animations.interval-ticks"),
+        "an explicit later cadence change is respected");
+    Files.writeString(path, "animations: {interval-ticks: 3}\n");
+    assertEquals(3, files.load().getInt("animations.interval-ticks"));
+    assertEquals("animations: {interval-ticks: 3}\n", Files.readString(path));
+  }
+
+  @Test
+  void migratesInlineTenTickSettingWithoutChangingTheLegacyConfig() throws Exception {
+    String original =
+        "initial-season: {name: Winter, year: 2026}\n"
+            + "animations:\n"
+            + "  interval-ticks: 10\n"
+            + "  enabled: false\n";
+    Files.writeString(folder.resolve("config.yml"), original);
+    var merged = new ConfigurationFiles(folder).load();
+    assertEquals(1, merged.getInt("animations.interval-ticks"));
+    assertFalse(merged.getBoolean("animations.enabled"));
+    assertEquals(original, Files.readString(folder.resolve("config.yml")));
+  }
+
+  @Test
   void existingSplitFilesRemainByteForByteAndReplaceInlineSections() throws Exception {
     String original =
         "initial-season:\n"

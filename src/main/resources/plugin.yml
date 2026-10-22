@@ -9,11 +9,11 @@ commands:
     aliases: [title]
     permission: seasonaltitles.use;seasonaltitles.preview;seasonaltitles.admin
     description: Manage and preview cosmetic titles
-    usage: /titles [list|equip|unequip|preview|animation|animations|on|off|help|admin]
+    usage: /titles [list|equip|unequip|preview|animation|animations|on|off|vouchers|help|admin]
   sti:
     permission: seasonaltitles.admin
     description: SeasonalTitles administration
-    usage: /sti <enroll|addrole|removerole|roles|create|delete|give|revoke|custom>
+    usage: /sti <enroll|addrole|removerole|roles|create|delete|give|revoke|custom|voucher>
 permissions:
   seasonaltitles.use:
     default: true

@@ -47,14 +47,25 @@ public final class Store implements AutoCloseable {
           "CREATE TABLE IF NOT EXISTS transitions (id INTEGER PRIMARY KEY AUTOINCREMENT, season"
               + " TEXT, year INTEGER, activated_at INTEGER, actor TEXT)");
       try (ResultSet version = s.executeQuery("PRAGMA user_version")) {
-        if (version.next() && version.getInt(1) > 2)
+        if (version.next() && version.getInt(1) > 3)
           throw new SQLException("Database is newer than this plugin; refusing to downgrade.");
       }
       s.execute(
           "CREATE TABLE IF NOT EXISTS preferences (uuid TEXT PRIMARY KEY REFERENCES players(uuid),"
               + " animation TEXT NOT NULL DEFAULT 'default', show_animations INTEGER NOT NULL"
               + " DEFAULT 1, show_titles INTEGER NOT NULL DEFAULT 1)");
-      s.execute("PRAGMA user_version=2");
+      s.execute(
+          "CREATE TABLE IF NOT EXISTS animation_unlocks (uuid TEXT NOT NULL REFERENCES"
+              + " players(uuid), effect TEXT NOT NULL, unlocked_at INTEGER NOT NULL, PRIMARY"
+              + " KEY(uuid,effect))");
+      s.execute(
+          "CREATE TABLE IF NOT EXISTS animation_vouchers (token TEXT PRIMARY KEY, effect TEXT NOT"
+              + " NULL, delivery_to TEXT REFERENCES players(uuid), issued_at INTEGER NOT NULL,"
+              + " redeemed_by TEXT REFERENCES players(uuid), redeemed_at INTEGER)");
+      s.execute(
+          "CREATE INDEX IF NOT EXISTS animation_voucher_delivery ON animation_vouchers(delivery_to)"
+              + " WHERE redeemed_by IS NULL AND delivery_to IS NOT NULL");
+      s.execute("PRAGMA user_version=3");
     }
     transaction(
         () -> {
@@ -260,6 +271,77 @@ public final class Store implements AutoCloseable {
         });
   }
 
+  public void issueVoucher(AnimationVoucher voucher, UUID recipient) throws Exception {
+    transaction(
+        () -> {
+          remember(recipient, null);
+          update(
+              "INSERT INTO animation_vouchers(token,effect,delivery_to,issued_at) VALUES(?,?,?,?)",
+              voucher.token().toString(),
+              voucher.effect(),
+              recipient.toString(),
+              Instant.now().toEpochMilli());
+        });
+  }
+
+  public List<AnimationVoucher> pendingVouchers(UUID player) throws SQLException {
+    List<AnimationVoucher> result = new ArrayList<>();
+    try (PreparedStatement query =
+        db.prepareStatement(
+            "SELECT token,effect FROM animation_vouchers WHERE delivery_to=? AND redeemed_by IS"
+                + " NULL ORDER BY issued_at,token LIMIT 128")) {
+      query.setString(1, player.toString());
+      try (ResultSet rows = query.executeQuery()) {
+        while (rows.next())
+          result.add(new AnimationVoucher(UUID.fromString(rows.getString(1)), rows.getString(2)));
+      }
+    }
+    return result;
+  }
+
+  public void deliveredVouchers(UUID player, Collection<UUID> tokens) throws Exception {
+    transaction(
+        () -> {
+          for (UUID token : tokens)
+            update(
+                "UPDATE animation_vouchers SET delivery_to=NULL WHERE token=? AND delivery_to=?",
+                token.toString(),
+                player.toString());
+        });
+  }
+
+  /** The token and unlock commit together before the physical item is consumed. */
+  public void redeemVoucher(UUID player, AnimationVoucher voucher) throws Exception {
+    transaction(
+        () -> {
+          if (!exists(
+              "SELECT 1 FROM animation_vouchers WHERE token=? AND effect=? AND redeemed_by IS NULL",
+              voucher.token().toString(),
+              voucher.effect()))
+            throw new IllegalArgumentException(
+                "This voucher is invalid or has already been redeemed.");
+          if (exists(
+              "SELECT 1 FROM animation_unlocks WHERE uuid=? AND effect=?",
+              player.toString(),
+              voucher.effect()))
+            throw new IllegalArgumentException(
+                "You already permanently unlocked " + voucher.effect() + ". Voucher kept.");
+          remember(player, null);
+          long now = Instant.now().toEpochMilli();
+          update(
+              "INSERT INTO animation_unlocks VALUES(?,?,?)",
+              player.toString(),
+              voucher.effect(),
+              now);
+          update(
+              "UPDATE animation_vouchers SET redeemed_by=?,redeemed_at=?,delivery_to=NULL WHERE"
+                  + " token=?",
+              player.toString(),
+              now,
+              voucher.token().toString());
+        });
+  }
+
   public void delete(String id, boolean confirmed) throws Exception {
     transaction(
         () -> {
@@ -355,8 +437,16 @@ public final class Store implements AutoCloseable {
                 r.getBoolean("show_animations"),
                 r.getBoolean("show_titles")));
     }
+    Map<UUID, Set<String>> unlocks = new HashMap<>();
+    try (Statement s = db.createStatement();
+        ResultSet r = s.executeQuery("SELECT uuid,effect FROM animation_unlocks")) {
+      while (r.next())
+        unlocks
+            .computeIfAbsent(UUID.fromString(r.getString(1)), ignored -> new HashSet<>())
+            .add(r.getString(2));
+    }
     return new Snapshot(
-        season(), titles, owned, equipped, roles, enrolled, pending, names, preferences);
+        season(), titles, owned, equipped, roles, enrolled, pending, names, preferences, unlocks);
   }
 
   public long changes() throws SQLException {

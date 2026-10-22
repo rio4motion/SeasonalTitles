@@ -23,7 +23,6 @@ public final class TitleRenderer {
   private final Map<UUID, Title> selectedTitles = new HashMap<>();
   private final Map<UUID, String> effects = new HashMap<>();
   private final Map<UUID, Long> epochs = new HashMap<>();
-  private long frame;
   private final Set<UUID> animated = new HashSet<>();
 
   public TitleRenderer(SeasonalTitlesPlugin plugin) {
@@ -66,12 +65,13 @@ public final class TitleRenderer {
               owner,
               plugin.state().preferences(id),
               plugin.settings().customTitles().get(title.id()),
-              title.id());
+              title.id(),
+              plugin.state().animationUnlocks(id));
       boolean changed =
           !title.equals(selectedTitles.put(id, title)) || !effect.equals(effects.get(id));
       effects.put(id, effect);
       if (changed) {
-        epochs.put(id, frame);
+        epochs.put(id, tick);
         updateText(
             display, effect.equals("static") ? text(title) : animationFrame(title, effect, 0));
       }
@@ -133,7 +133,7 @@ public final class TitleRenderer {
 
   /** One shared animation task; safety visibility remains a separate one-tick task. */
   public void animate() {
-    frame++;
+    long frame = plugin.tick();
     for (UUID id : animated) {
       TextDisplay display = displays.get(id);
       String effect = effects.getOrDefault(id, "static");
@@ -151,7 +151,8 @@ public final class TitleRenderer {
                   owner,
                   plugin.state().preferences(id),
                   plugin.settings().customTitles().get(title.id()),
-                  title.id()))) continue;
+                  title.id(),
+                  plugin.state().animationUnlocks(id)))) continue;
       updateText(display, animationFrame(title, effect, frame - epochs.getOrDefault(id, frame)));
     }
   }

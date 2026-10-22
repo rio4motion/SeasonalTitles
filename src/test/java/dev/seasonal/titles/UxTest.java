@@ -53,6 +53,44 @@ class UxTest {
   }
 
   @Test
+  void voucherCreationRequiresAdminAndPermanentUnlocksAreSuggestedWithoutOp() throws Exception {
+    var plugin = mock(SeasonalTitlesPlugin.class);
+    var settings = Settings.read(PresentationTest.config());
+    when(plugin.settings()).thenReturn(settings);
+    UUID id = UUID.randomUUID();
+    when(plugin.state())
+        .thenReturn(
+            new Snapshot(
+                Season.parse("Winter", "2026"),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Set.of(),
+                Set.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(id, Set.of("fire"))));
+    Player player = mock(Player.class);
+    when(player.getUniqueId()).thenReturn(id);
+    when(player.hasPermission("seasonaltitles.use")).thenReturn(true);
+    Command command = mock(Command.class);
+    when(command.getName()).thenReturn("titles");
+    var handler = new TitleCommands(plugin);
+    handler.onCommand(player, command, "title", new String[] {"admin", "voucher", "fire"});
+    verify(plugin, never()).vouchers();
+    assertEquals(
+        List.of("fire"),
+        handler.onTabComplete(player, command, "title", new String[] {"animation", "f"}));
+    when(player.hasPermission(settings.adminPermission())).thenReturn(true);
+    var vouchers = mock(AnimationVouchers.class);
+    when(plugin.vouchers()).thenReturn(vouchers);
+    when(vouchers.issue(player, "fire")).thenReturn(CompletableFuture.completedFuture(null));
+    handler.onCommand(player, command, "title", new String[] {"admin", "voucher", "fire"});
+    verify(vouchers).issue(player, "fire");
+  }
+
+  @Test
   void unprivilegedCustomTextNeverReachesDefinitionMutationAndRevokeRequiresConfirmation()
       throws Exception {
     var plugin = mock(SeasonalTitlesPlugin.class);

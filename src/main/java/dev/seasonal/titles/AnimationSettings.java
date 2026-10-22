@@ -18,7 +18,7 @@ public record AnimationSettings(
   }
 
   public static AnimationSettings read(FileConfiguration c) {
-    int interval = c.getInt("animations.interval-ticks", 10);
+    int interval = c.getInt("animations.interval-ticks", 1);
     double distance = c.getDouble("animations.visibility-distance", 32);
     if (interval < 1
         || interval > 200
@@ -61,6 +61,11 @@ public record AnimationSettings(
   }
 
   public boolean allowed(Player player, String id, CustomDefinition definition, String titleId) {
+    return allowed(player, id, definition, titleId, Set.of());
+  }
+
+  public boolean allowed(
+      Player player, String id, CustomDefinition definition, String titleId, Set<String> unlocks) {
     if (id.equals("static")) return true;
     Effect effect = effects.get(id);
     return !staticOnlyTitles.contains(titleId == null ? "" : titleId)
@@ -72,7 +77,9 @@ public record AnimationSettings(
             || definition.allowedAnimations().contains(id))
         // LuckPerms/Bukkit resolves wildcard inheritance here; a separate wildcard OR
         // would incorrectly override a specific false permission.
-        && (player.isOp() || player.hasPermission("seasonaltitles.animation." + id));
+        && (player.isOp()
+            || unlocks.contains(id)
+            || player.hasPermission("seasonaltitles.animation." + id));
   }
 
   public String effective(
@@ -82,10 +89,19 @@ public record AnimationSettings(
 
   public String effective(
       Player owner, PlayerPreferences preferences, CustomDefinition definition, String titleId) {
+    return effective(owner, preferences, definition, titleId, Set.of());
+  }
+
+  public String effective(
+      Player owner,
+      PlayerPreferences preferences,
+      CustomDefinition definition,
+      String titleId,
+      Set<String> unlocks) {
     String requested =
         preferences.animation().equals("default")
             ? (definition == null ? defaultEffect : definition.defaultAnimation())
             : preferences.animation();
-    return allowed(owner, requested, definition, titleId) ? requested : "static";
+    return allowed(owner, requested, definition, titleId, unlocks) ? requested : "static";
   }
 }

@@ -14,7 +14,6 @@ import net.kyori.adventure.text.format.TextColor;
 public final class AnimationFrames {
   private static final int MAX_CODE_POINTS = 256;
   private static final int MAX_COMPONENTS = 256;
-  private static final int[] GLITCH_GLYPHS = {'#', '%', '?', '/', '!', '*'};
   private static final int[][] FIRE = {
     {255, 244, 164}, {255, 190, 70}, {255, 123, 32}, {220, 48, 24}, {255, 213, 92}
   };
@@ -45,7 +44,10 @@ public final class AnimationFrames {
     IdentityHashMap<TextComponent, TextRange> ranges = new IdentityHashMap<>();
     if (effect == AnimationEffect.TYPEWRITER) {
       int total = countTypewriterUnits(base, new Budget(), 0);
-      int visible = total == 0 ? 0 : (int) Math.floor(phase(frame, safeSpeed(speed)) * total) + 1;
+      int visible =
+          total == 0
+              ? 0
+              : (int) Math.floor(Math.min(1, phase(frame, safeSpeed(speed)) / 0.30) * total) + 1;
       allocateTypewriterVisibility(base, new Budget(), typewriterVisibility, visible, 0);
     } else {
       int[] total = {0};
@@ -138,25 +140,6 @@ public final class AnimationFrames {
       return original.content(shown.toString()).children(mappedChildren);
     }
 
-    if (effect == AnimationEffect.GLITCH) {
-      StringBuilder distorted = new StringBuilder(content.length());
-      long seed = mix64(Double.doubleToLongBits(phase) ^ 0x5deece66dL);
-      for (int i = 0; i < units.size(); i++) {
-        String glyph = units.get(i);
-        long globalIndex = range == null ? i : range.start + i;
-        long value = mix64(seed + globalIndex * 0x9e3779b97f4a7c15L);
-        // Distort a small, deterministic fraction of glyphs; all other Unicode remains intact.
-        if (Math.floorMod(value, 11) == 0) {
-          distorted.appendCodePoint(
-              GLITCH_GLYPHS[Math.floorMod((int) (value >>> 32), GLITCH_GLYPHS.length)]);
-        } else {
-          distorted.append(glyph);
-        }
-      }
-      distorted.append(suffix);
-      return original.content(distorted.toString()).children(mappedChildren);
-    }
-
     List<Component> colored = new ArrayList<>(units.size() + 1);
     for (int i = 0; i < units.size(); i++) {
       int globalIndex = range == null ? i : range.start + i;
@@ -176,45 +159,58 @@ public final class AnimationFrames {
       AnimationEffect effect, int index, int total, double phase, List<TextColor> palette) {
     double position = total <= 1 ? 0 : index / (double) (total - 1);
     int color;
+    double angle = phase * Math.PI * 2;
     switch (effect) {
-      case RAINBOW -> color = hsv((position + phase) % 1.0, 0.86, 1.0);
-      case GRADIENT ->
-          color = interpolate(palette, phase == 0 ? position : fract(position + phase));
+      case RAINBOW -> color = hsv(position * 0.7 - phase, 0.78, 1.0);
+      // A cyclic, eased palette has no discontinuity where the moving gradient wraps.
+      // Subtracting phase carries a color feature from left to right (forward).
+      case GRADIENT -> color = cyclic(palette, position * 0.5 - phase);
       case PULSE -> {
-        double wave = (Math.sin((phase + position * 0.14) * Math.PI * 2) + 1) / 2;
-        color = interpolate(palette, wave * (palette.size() - 1) / Math.max(1, palette.size() - 1));
-        color = scale(color, 0.55 + 0.45 * wave);
+        double breath = (1 - Math.cos(angle)) / 2;
+        color = scale(interpolate(palette, position), 0.68 + 0.32 * breath);
       }
       case SHIMMER -> {
-        double distance = Math.abs(fract(position - phase + 0.5) - 0.5);
-        double shine = Math.max(0, 1 - distance * 4);
-        color = blend(interpolate(palette, position), 0xFFFFFF, shine * 0.78);
+        double distance = Math.abs(fract(position * 0.7 - phase + 0.5) - 0.5);
+        double shine = Math.exp(-distance * distance * 80);
+        color = blend(interpolate(palette, position), 0xFFFFFF, shine * 0.85);
       }
       case SPARKLE -> {
-        long noise = mix64(frameKey(phase) + index * 0x9e3779b97f4a7c15L);
-        color =
-            Math.floorMod(noise, 13) == 0
-                ? palette.get(Math.floorMod((int) (noise >>> 32), palette.size())).value()
-                : palette.get(0).value();
+        double offset = unitNoise(index);
+        double glint = Math.pow((1 + Math.sin(angle * 2 + offset * Math.PI * 2)) / 2, 12);
+        color = blend(interpolate(palette, position), 0xFFFFFF, glint * 0.90);
       }
       case FIRE -> {
-        long noise = mix64(frameKey(phase) / 3 + index * 0x632be59bd9b4e019L);
-        double flicker = Math.floorMod(noise, 1000) / 1000.0;
-        color = interpolate(palette, fract(position * 0.3 + flicker * 0.55 + phase * 0.16));
+        // Continuous waves replace frame-hashed noise, avoiding strobe-like jumps at 20 Hz.
+        double heat =
+            0.50
+                + 0.23 * Math.sin(angle * 2 - position * 5)
+                + 0.16 * Math.sin(angle * 3 + position * 11 + unitNoise(index) * 2);
+        color = interpolate(palette, heat);
+      }
+      case GLITCH -> {
+        // Retain the legacy effect ID as a readable neon scan; never scramble title text.
+        double scan = Math.pow((1 + Math.cos(angle * 2 - position * 9)) / 2, 8);
+        color = blend(cyclic(palette, position * 0.5 - phase), 0xFFFFFF, scan * 0.65);
       }
       case FLICKER -> {
-        long noise = mix64(frameKey(phase) / 2 + index * 0x9e3779b97f4a7c15L);
-        double brightness =
-            Math.floorMod(noise, 7) == 0 ? 0.46 : 0.78 + (Math.floorMod(noise >>> 8, 23) / 100.0);
-        color = scale(palette.get(0).value(), brightness);
+        double glow = 0.88 + 0.07 * Math.sin(angle * 3) + 0.05 * Math.sin(angle * 7 + position * 2);
+        color = scale(interpolate(palette, position), glow);
       }
       default -> color = palette.get(0).value();
     }
     return color;
   }
 
-  private static long frameKey(double phase) {
-    return Double.doubleToLongBits(phase);
+  private static double unitNoise(int index) {
+    return (mix64(index * 0x9e3779b97f4a7c15L) >>> 11) * 0x1.0p-53;
+  }
+
+  private static int cyclic(List<TextColor> colors, double at) {
+    if (colors.size() == 1) return colors.get(0).value();
+    double scaled = fract(at) * colors.size();
+    int lower = (int) Math.floor(scaled);
+    double ease = (1 - Math.cos((scaled - lower) * Math.PI)) / 2;
+    return blend(colors.get(lower).value(), colors.get((lower + 1) % colors.size()).value(), ease);
   }
 
   private static List<String> graphemes(String text) {
@@ -348,12 +344,15 @@ public final class AnimationFrames {
   }
 
   private static double phase(long frame, double speed) {
-    double value = frame * speed * 0.035;
+    // Time is elapsed server ticks, independent of the configured sampling interval.
+    double value = frame * speed / 120.0;
     return fract(value);
   }
 
   private static double fract(double value) {
-    return value - Math.floor(value);
+    double fraction = value - Math.floor(value);
+    // Tiny negative values can round to 1.0 after subtraction; keep cyclic indices in range.
+    return fraction >= 1 ? 0 : fraction;
   }
 
   private static int interpolate(List<TextColor> colors, double at) {

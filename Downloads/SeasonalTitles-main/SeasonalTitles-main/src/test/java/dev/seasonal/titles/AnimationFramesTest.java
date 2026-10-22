@@ -111,6 +111,64 @@ class AnimationFramesTest {
   }
 
   @Test
+  void gradientMovesForwardAndWrapsWithoutAColorJumpAtOneTickCadence() {
+    Component base = Component.text("x".repeat(31));
+    var palette = List.of("#FF0000", "#0000FF");
+    var initial =
+        coloredGlyphColors(AnimationFrames.frame(base, AnimationEffect.GRADIENT, 0, palette, 1));
+    var moved =
+        coloredGlyphColors(AnimationFrames.frame(base, AnimationEffect.GRADIENT, 2, palette, 1));
+    assertEquals(
+        initial.get(4), moved.get(5), "features move one character to the right per two ticks");
+    assertNotEquals(initial.get(4), moved.get(3), "flow must not move backwards");
+    for (int tick = 0; tick < 240; tick++) {
+      var first =
+          coloredGlyphColors(
+              AnimationFrames.frame(base, AnimationEffect.GRADIENT, tick, palette, 1));
+      var next =
+          coloredGlyphColors(
+              AnimationFrames.frame(base, AnimationEffect.GRADIENT, tick + 1, palette, 1));
+      for (int i = 0; i < first.size(); i++)
+        assertTrue(maxChannelChange(first.get(i), next.get(i)) <= 14);
+    }
+  }
+
+  @Test
+  void colorEffectsStayReadableAndContinuousAndTypewriterHoldsTheCompleteTitle() {
+    Component base = Component.text("A lovely title");
+    for (AnimationEffect effect : AnimationEffect.values()) {
+      if (effect == AnimationEffect.TYPEWRITER || effect == AnimationEffect.STATIC) continue;
+      for (int tick = 0; tick < 120; tick++) {
+        var a = AnimationFrames.frame(base, effect, tick, List.of(), 1);
+        var b = AnimationFrames.frame(base, effect, tick + 1, List.of(), 1);
+        assertEquals("A lovely title", plainText(a), "no character corruption in " + effect);
+        var before = coloredGlyphColors(a);
+        var after = coloredGlyphColors(b);
+        for (int i = 0; i < before.size(); i++)
+          assertTrue(
+              maxChannelChange(before.get(i), after.get(i)) <= 65,
+              effect + " changes too abruptly at tick " + tick);
+      }
+    }
+    assertEquals(
+        "A lovely title",
+        plainText(AnimationFrames.frame(base, AnimationEffect.TYPEWRITER, 50, List.of(), 1)));
+    assertEquals(
+        "A lovely title",
+        plainText(AnimationFrames.frame(base, AnimationEffect.TYPEWRITER, 110, List.of(), 1)));
+    assertEquals(
+        AnimationFrames.frame(base, AnimationEffect.GRADIENT, 40, List.of(), 1),
+        AnimationFrames.frame(base, AnimationEffect.GRADIENT, 20, List.of(), 2),
+        "speed scales elapsed ticks");
+  }
+
+  private static int maxChannelChange(TextColor a, TextColor b) {
+    return Math.max(
+        Math.abs(a.red() - b.red()),
+        Math.max(Math.abs(a.green() - b.green()), Math.abs(a.blue() - b.blue())));
+  }
+
+  @Test
   void glitchFreezesAtZeroSpeedAndChangesWhenSpeedAdvancesItsPhase() {
     Component base =
         Component.text("A title with enough glyphs to exercise glitch effects.".repeat(4));
